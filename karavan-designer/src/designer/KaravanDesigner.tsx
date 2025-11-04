@@ -46,6 +46,7 @@ import {VariableUtil} from "karavan-core/lib/api/VariableUtil";
 import {ErrorBoundaryState, ErrorBoundaryWrapper} from "./ErrorBoundaryWrapper";
 import {Panel, PanelGroup, PanelResizeHandle} from 'react-resizable-panels';
 import {MainPropertiesPanel} from "./property/MainPropertiesPanel";
+import {DataMapper} from "./data-mapper/DataMapper";
 
 interface Props {
     onSave: (filename: string, yaml: string, propertyOnly: boolean) => void
@@ -57,7 +58,7 @@ interface Props {
     yaml: string
     dark: boolean
     showCodeTab: boolean
-    tab?: "routes" | "rest" | "beans" | "kamelet"
+    tab?: "routes" | "rest" | "beans" | "kamelet" | "data-mapper"
     propertyPlaceholders: string[]
     beans: BeanFactoryDefinition[]
     files: IntegrationFile[]
@@ -193,8 +194,8 @@ export function KaravanDesigner(props: Props) {
                     <Tabs className="main-tabs"
                           activeKey={tab}
                           onSelect={(event, tabIndex: string | number) => {
-                              const tab = tabIndex.toString() as "routes" | "rest" | "beans" | "kamelet" | "code";
-                              if (["routes", "rest", "beans", "kamelet", "code"].includes(tab)) {
+                              const tab = tabIndex.toString() as "routes" | "rest" | "beans" | "kamelet" | "data-mapper" | "code";
+                              if (["routes", "rest", "beans", "kamelet", "data-mapper", "code"].includes(tab)) {
                                   setTab(tab);
                               } else {
                                   setTab(undefined); // Handle unexpected values
@@ -206,6 +207,7 @@ export function KaravanDesigner(props: Props) {
                         <Tab eventKey='routes' title={getTab("Routes", "Integration flows", "routes")}></Tab>
                         {!isKamelet && <Tab eventKey='rest' title={getTab("REST", "REST services", "rest")}></Tab>}
                         <Tab eventKey='beans' title={getTab("Beans", "Beans Configuration", "beans")}></Tab>
+                        <Tab eventKey='data-mapper' title={getTab("Data Mapper", "Visual JSLT designer", "data-mapper")}></Tab>
                         {props.showCodeTab && <Tab eventKey='code' title={getTab("YAML", "YAML Code", "code", true)}></Tab>}
                     </Tabs>
                 </div>
@@ -214,6 +216,7 @@ export function KaravanDesigner(props: Props) {
                     {tab === 'routes' && <RouteDesigner/>}
                     {tab === 'rest' && <RestDesigner/>}
                     {tab === 'beans' && <BeansDesigner/>}
+                    {tab === 'data-mapper' && <DataMapper/>}
                     {tab === 'code' && <CodeEditor/>}
                 </ErrorBoundaryWrapper>
             </PageSection>
@@ -221,7 +224,7 @@ export function KaravanDesigner(props: Props) {
     }
 
     return (
-        (tab !== 'code' && tab !== 'kamelet')
+        (tab !== 'code' && tab !== 'kamelet' && tab !== 'data-mapper')
         ? <PanelGroup direction="horizontal" style={{backgroundColor: 'white'}}>
             <Panel minSize={10} defaultSize={70}>
                 {getMainPart()}
