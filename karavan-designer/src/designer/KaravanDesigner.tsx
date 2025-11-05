@@ -46,7 +46,8 @@ import {VariableUtil} from "karavan-core/lib/api/VariableUtil";
 import {ErrorBoundaryState, ErrorBoundaryWrapper} from "./ErrorBoundaryWrapper";
 import {Panel, PanelGroup, PanelResizeHandle} from 'react-resizable-panels';
 import {MainPropertiesPanel} from "./property/MainPropertiesPanel";
-import {DataMapper} from "./data-mapper/DataMapper";
+import {ReactFlowDataMapper} from "./data-mapper/ReactFlowDataMapper";
+import {ReactFlowProvider} from 'reactflow';
 
 interface Props {
     onSave: (filename: string, yaml: string, propertyOnly: boolean) => void
@@ -216,7 +217,11 @@ export function KaravanDesigner(props: Props) {
                     {tab === 'routes' && <RouteDesigner/>}
                     {tab === 'rest' && <RestDesigner/>}
                     {tab === 'beans' && <BeansDesigner/>}
-                    {tab === 'data-mapper' && <DataMapper/>}
+                    {tab === 'data-mapper' && (
+                        <ReactFlowProvider>
+                            <ReactFlowDataMapper/>
+                        </ReactFlowProvider>
+                    )}
                     {tab === 'code' && <CodeEditor/>}
                 </ErrorBoundaryWrapper>
             </PageSection>
