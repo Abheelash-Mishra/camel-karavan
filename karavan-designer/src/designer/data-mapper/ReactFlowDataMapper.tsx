@@ -195,9 +195,10 @@ export function ReactFlowDataMapper() {
         let sourceYPosition = 0;
         let targetYPosition = 0;
 
-        // Add source schema fields
+        // Add source schema fields (only root-level fields without parent)
         if (sourceSchema) {
-            sourceSchema.fields.forEach((field) => {
+            const rootFields = sourceSchema.fields.filter(field => !field.parent);
+            rootFields.forEach((field) => {
                 newNodes.push({
                     id: `source-${field.id}`,
                     type: 'fieldNode',
@@ -211,6 +212,29 @@ export function ReactFlowDataMapper() {
                     },
                 });
                 sourceYPosition += 80;
+                
+                // Add all children of this field (flattened for visual display)
+                const addChildren = (parentField: FieldDefinition, currentY: number) => {
+                    if (parentField.children) {
+                        parentField.children.forEach((child) => {
+                            newNodes.push({
+                                id: `source-${child.id}`,
+                                type: 'fieldNode',
+                                position: { x: 50, y: sourceYPosition },
+                                data: {
+                                    field: child,
+                                    side: 'source',
+                                    onArrayModeChange: handleArrayModeChange,
+                                    onIndexSelectorChange: handleIndexSelectorChange,
+                                    onListMappingOpen: handleListMappingOpen,
+                                },
+                            });
+                            sourceYPosition += 80;
+                            addChildren(child, sourceYPosition);
+                        });
+                    }
+                };
+                addChildren(field, sourceYPosition);
             });
         }
 
@@ -236,9 +260,10 @@ export function ReactFlowDataMapper() {
             sourceYPosition += 80;
         });
 
-        // Add target schema fields
+        // Add target schema fields (only root-level fields without parent)
         if (targetSchema) {
-            targetSchema.fields.forEach((field) => {
+            const rootFields = targetSchema.fields.filter(field => !field.parent);
+            rootFields.forEach((field) => {
                 newNodes.push({
                     id: `target-${field.id}`,
                     type: 'fieldNode',
@@ -249,6 +274,26 @@ export function ReactFlowDataMapper() {
                     },
                 });
                 targetYPosition += 80;
+                
+                // Add all children of this field (flattened for visual display)
+                const addChildren = (parentField: FieldDefinition, currentY: number) => {
+                    if (parentField.children) {
+                        parentField.children.forEach((child) => {
+                            newNodes.push({
+                                id: `target-${child.id}`,
+                                type: 'fieldNode',
+                                position: { x: 600, y: targetYPosition },
+                                data: {
+                                    field: child,
+                                    side: 'target',
+                                },
+                            });
+                            targetYPosition += 80;
+                            addChildren(child, targetYPosition);
+                        });
+                    }
+                };
+                addChildren(field, targetYPosition);
             });
         }
 
