@@ -19,7 +19,17 @@ export type FieldType = 'string' | 'number' | 'boolean' | 'object' | 'array' | '
 
 export type ArrayIterationMode = 'for-loop' | 'index-access' | 'direct';
 
+export type IndexSelector = 'first' | 'second' | 'third' | 'last' | 'custom';
+
 export type SchemaType = 'json-schema' | 'json-instance';
+
+export interface ListMappingConfig {
+    id: string;
+    sourceArrayPath: string;
+    targetArrayPath: string;
+    fieldMappings: FieldMapping[];
+    nestedLevel: number; // Support up to 3 levels of nesting
+}
 
 export interface FieldDefinition {
     id: string;
@@ -28,6 +38,9 @@ export interface FieldDefinition {
     type: FieldType;
     isArray: boolean;
     arrayIterationMode?: ArrayIterationMode;
+    indexSelector?: IndexSelector;
+    customIndex?: number;
+    listMappingConfig?: ListMappingConfig;
     children?: FieldDefinition[];
     parent?: string;
     description?: string;

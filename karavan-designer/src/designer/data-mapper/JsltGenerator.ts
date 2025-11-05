@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-import { FieldDefinition, FieldMapping, SchemaData } from './DataMapperTypes';
+import { FieldDefinition, FieldMapping, SchemaData, IndexSelector, ListMappingConfig } from './DataMapperTypes';
 import { SchemaParser } from './SchemaParser';
 
 export class JsltGenerator {
@@ -26,7 +26,8 @@ export class JsltGenerator {
     static generate(
         sourceSchema: SchemaData | undefined,
         targetSchema: SchemaData | undefined,
-        mappings: FieldMapping[]
+        mappings: FieldMapping[],
+        listMappingConfigs: ListMappingConfig[] = []
     ): string {
         if (!sourceSchema || !targetSchema || mappings.length === 0) {
             return '// No mappings defined\n.';
@@ -36,7 +37,7 @@ export class JsltGenerator {
         const targetFields = SchemaParser.flattenFields(targetSchema.fields);
 
         // Build the target structure
-        const jslt = this.buildTargetStructure(targetFields, mappings, sourceFields);
+        const jslt = this.buildTargetStructure(targetFields, mappings, sourceFields, listMappingConfigs);
         
         return jslt;
     }
@@ -47,7 +48,8 @@ export class JsltGenerator {
     private static buildTargetStructure(
         targetFields: FieldDefinition[],
         mappings: FieldMapping[],
-        sourceFields: FieldDefinition[]
+        sourceFields: FieldDefinition[],
+        listMappingConfigs: ListMappingConfig[] = []
     ): string {
         const rootFields = targetFields.filter(f => !f.parent);
         
@@ -72,7 +74,8 @@ export class JsltGenerator {
         fields: FieldDefinition[],
         mappings: FieldMapping[],
         sourceFields: FieldDefinition[],
-        pathPrefix: string
+        pathPrefix: string,
+        listMappingConfigs: ListMappingConfig[] = []
     ): string {
         const lines: string[] = ['{'];
         const mappedFields = new Map<string, FieldDefinition>();
@@ -199,9 +202,10 @@ export class JsltGenerator {
 
         let expr = this.getJsltPath(sourceField.path);
 
-        // Handle array index access
+        // Handle array index access with IndexSelector support
         if (sourceField.isArray && sourceField.arrayIterationMode === 'index-access') {
-            expr = expr + '[0]';
+            const indexValue = this.getIndexValue(sourceField.indexSelector, sourceField.customIndex);
+            expr = expr + `[${indexValue}]`;
         }
 
         // Apply transformation if specified
@@ -306,5 +310,59 @@ export class JsltGenerator {
             valid: errors.length === 0,
             errors
         };
+    }
+
+    /**
+     * Get index value from IndexSelector
+     */
+    private static getIndexValue(indexSelector?: IndexSelector, customIndex?: number): string {
+        switch (indexSelector) {
+            case 'first':
+                return '0';
+            case 'second':
+                return '1';
+            case 'third':
+                return '2';
+            case 'last':
+                return '-1';
+            case 'custom':
+                return customIndex !== undefined ? customIndex.toString() : '0';
+            default:
+                return '0'; // Default to first
+        }
+    }
+
+    /**
+     * Build list-to-list mapping using ListMappingConfig
+     */
+    private static buildListToListMapping(config: ListMappingConfig, sourceFields: FieldDefinition[]): string {
+        const sourceArrayPath = this.getJsltPath(config.sourceArrayPath);
+        
+        // Build the inner object mapping using the field mappings from the config
+        const fieldMappingLines: string[] = [];
+        
+        for (const mapping of config.fieldMappings) {
+            const sourceField = sourceFields.find(f => f.id === mapping.sourceFieldIds[0]);
+            if (sourceField) {
+                // Get the field name without the array path prefix
+                const targetFieldName = mapping.targetFieldId.split('.').pop() || mapping.targetFieldId;
+                const sourceExpression = this.buildMappingExpression(mapping, sourceFields);
+                
+                // Replace the array path with current item reference
+                const itemExpression = sourceExpression.replace(
+                    this.getJsltPath(config.sourceArrayPath),
+                    '.'
+                );
+                
+                fieldMappingLines.push(`  "${targetFieldName}": ${itemExpression}`);
+            }
+        }
+        
+        if (fieldMappingLines.length === 0) {
+            return `[for (${sourceArrayPath}) .]`;
+        }
+        
+        const objectMapping = `{\n${fieldMappingLines.join(',\n')}\n}`;
+        return `[for (${sourceArrayPath}) ${objectMapping}]`;
     }
 }

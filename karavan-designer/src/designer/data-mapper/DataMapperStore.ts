@@ -16,7 +16,7 @@
  */
 
 import { create } from 'zustand';
-import { FieldMapping, SchemaData, ValidationWarning, ConstantValue, FieldDefinition } from './DataMapperTypes';
+import { FieldMapping, SchemaData, ValidationWarning, ConstantValue, FieldDefinition, ArrayIterationMode, IndexSelector, ListMappingConfig } from './DataMapperTypes';
 
 interface DataMapperState {
     sourceSchema?: SchemaData;
@@ -36,6 +36,9 @@ interface DataMapperState {
     customTargetFields: FieldDefinition[];
     showAddConstantModal: boolean;
     showAddTargetFieldModal: boolean;
+    showListMappingModal: boolean;
+    selectedFieldForListMapping?: string;
+    listMappingConfigs: ListMappingConfig[];
 }
 
 interface DataMapperActions {
@@ -62,6 +65,12 @@ interface DataMapperActions {
     updateCustomTargetField: (id: string, updates: Partial<FieldDefinition>) => void;
     setShowAddConstantModal: (show: boolean) => void;
     setShowAddTargetFieldModal: (show: boolean) => void;
+    updateFieldArrayMode: (fieldId: string, mode: ArrayIterationMode) => void;
+    updateFieldIndexSelector: (fieldId: string, selector: IndexSelector, customIndex?: number) => void;
+    setShowListMappingModal: (show: boolean, fieldId?: string) => void;
+    addListMappingConfig: (config: ListMappingConfig) => void;
+    updateListMappingConfig: (id: string, config: ListMappingConfig) => void;
+    removeListMappingConfig: (id: string) => void;
     clearAll: () => void;
     clearMappings: () => void;
 }
@@ -84,12 +93,38 @@ const initialState: DataMapperState = {
     customTargetFields: [],
     showAddConstantModal: false,
     showAddTargetFieldModal: false,
+    showListMappingModal: false,
+    selectedFieldForListMapping: undefined,
+    listMappingConfigs: [],
 };
 
 export const useDataMapperStore = create<DataMapperState & DataMapperActions>((set) => ({
     ...initialState,
 
-    setSourceSchema: (schema) => set({ sourceSchema: schema }),
+    setSourceSchema: (schema) => {
+        // Migrate existing index-access fields to use 'first' selector by default
+        if (schema) {
+            const migrateFields = (fields: FieldDefinition[]): FieldDefinition[] => {
+                return fields.map(field => {
+                    const migratedField = {
+                        ...field,
+                        indexSelector: field.arrayIterationMode === 'index-access' && !field.indexSelector 
+                            ? 'first' as IndexSelector 
+                            : field.indexSelector
+                    };
+                    if (field.children) {
+                        migratedField.children = migrateFields(field.children);
+                    }
+                    return migratedField;
+                });
+            };
+            schema = {
+                ...schema,
+                fields: migrateFields(schema.fields)
+            };
+        }
+        set({ sourceSchema: schema });
+    },
     
     setTargetSchema: (schema) => set({ targetSchema: schema }),
     
@@ -163,6 +198,75 @@ export const useDataMapperStore = create<DataMapperState & DataMapperActions>((s
     setShowAddConstantModal: (show) => set({ showAddConstantModal: show }),
     
     setShowAddTargetFieldModal: (show) => set({ showAddTargetFieldModal: show }),
+    
+    updateFieldArrayMode: (fieldId, mode) => set((state) => {
+        const updateFieldInSchema = (schema?: SchemaData): SchemaData | undefined => {
+            if (!schema) return schema;
+            const updateField = (field: FieldDefinition): FieldDefinition => {
+                if (field.id === fieldId) {
+                    return { ...field, arrayIterationMode: mode };
+                }
+                if (field.children) {
+                    return { ...field, children: field.children.map(updateField) };
+                }
+                return field;
+            };
+            return {
+                ...schema,
+                fields: schema.fields.map(updateField)
+            };
+        };
+        
+        return {
+            sourceSchema: updateFieldInSchema(state.sourceSchema),
+            targetSchema: updateFieldInSchema(state.targetSchema)
+        };
+    }),
+    
+    updateFieldIndexSelector: (fieldId, selector, customIndex) => set((state) => {
+        const updateFieldInSchema = (schema?: SchemaData): SchemaData | undefined => {
+            if (!schema) return schema;
+            const updateField = (field: FieldDefinition): FieldDefinition => {
+                if (field.id === fieldId) {
+                    return { 
+                        ...field, 
+                        indexSelector: selector,
+                        customIndex: selector === 'custom' ? customIndex : undefined
+                    };
+                }
+                if (field.children) {
+                    return { ...field, children: field.children.map(updateField) };
+                }
+                return field;
+            };
+            return {
+                ...schema,
+                fields: schema.fields.map(updateField)
+            };
+        };
+        
+        return {
+            sourceSchema: updateFieldInSchema(state.sourceSchema),
+            targetSchema: updateFieldInSchema(state.targetSchema)
+        };
+    }),
+    
+    setShowListMappingModal: (show, fieldId) => set({ 
+        showListMappingModal: show,
+        selectedFieldForListMapping: fieldId
+    }),
+    
+    addListMappingConfig: (config) => set((state) => ({
+        listMappingConfigs: [...state.listMappingConfigs, config]
+    })),
+    
+    updateListMappingConfig: (id, config) => set((state) => ({
+        listMappingConfigs: state.listMappingConfigs.map(c => c.id === id ? config : c)
+    })),
+    
+    removeListMappingConfig: (id) => set((state) => ({
+        listMappingConfigs: state.listMappingConfigs.filter(c => c.id !== id)
+    })),
     
     clearAll: () => set(initialState),
     

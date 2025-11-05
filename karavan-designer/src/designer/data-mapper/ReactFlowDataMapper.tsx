@@ -59,6 +59,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { shallow } from 'zustand/shallow';
 
 import { useDataMapperStore } from './DataMapperStore';
+import { ListMappingModal } from './ListMappingModal';
 import { FieldNode, FieldNodeData } from './FieldNode';
 import { MappingEdge, MappingEdgeData } from './MappingEdge';
 import { UploadFileModal } from './UploadFileModal';
@@ -75,6 +76,8 @@ import {
     SchemaType, 
     FieldMapping, 
     ArrayIterationMode,
+    IndexSelector,
+    ListMappingConfig,
     FieldDefinition,
     TransformationFunction,
 } from './DataMapperTypes';
@@ -105,6 +108,9 @@ export function ReactFlowDataMapper() {
         customTargetFields,
         showAddConstantModal,
         showAddTargetFieldModal,
+        showListMappingModal,
+        selectedFieldForListMapping,
+        listMappingConfigs,
         setSourceSchema,
         setTargetSchema,
         addMapping,
@@ -124,6 +130,10 @@ export function ReactFlowDataMapper() {
         removeCustomTargetField,
         setShowAddConstantModal,
         setShowAddTargetFieldModal,
+        updateFieldArrayMode,
+        updateFieldIndexSelector,
+        setShowListMappingModal,
+        addListMappingConfig,
         clearMappings,
     ] = useDataMapperStore(
         (s) => [
@@ -143,6 +153,9 @@ export function ReactFlowDataMapper() {
             s.customTargetFields,
             s.showAddConstantModal,
             s.showAddTargetFieldModal,
+            s.showListMappingModal,
+            s.selectedFieldForListMapping,
+            s.listMappingConfigs,
             s.setSourceSchema,
             s.setTargetSchema,
             s.addMapping,
@@ -162,6 +175,10 @@ export function ReactFlowDataMapper() {
             s.removeCustomTargetField,
             s.setShowAddConstantModal,
             s.setShowAddTargetFieldModal,
+            s.updateFieldArrayMode,
+            s.updateFieldIndexSelector,
+            s.setShowListMappingModal,
+            s.addListMappingConfig,
             s.clearMappings,
         ],
         shallow
@@ -189,6 +206,8 @@ export function ReactFlowDataMapper() {
                         field,
                         side: 'source',
                         onArrayModeChange: handleArrayModeChange,
+                        onIndexSelectorChange: handleIndexSelectorChange,
+                        onListMappingOpen: handleListMappingOpen,
                     },
                 });
                 sourceYPosition += 80;
@@ -322,32 +341,15 @@ export function ReactFlowDataMapper() {
     }, [mappings, sourceSchema, targetSchema]);
 
     const handleArrayModeChange = (fieldId: string, mode: ArrayIterationMode) => {
-        if (sourceSchema) {
-            const updatedFields = updateFieldArrayMode(sourceSchema.fields, fieldId, mode);
-            setSourceSchema({
-                ...sourceSchema,
-                fields: updatedFields,
-            });
-        }
+        updateFieldArrayMode(fieldId, mode);
     };
 
-    const updateFieldArrayMode = (
-        fields: FieldDefinition[],
-        fieldId: string,
-        mode: ArrayIterationMode
-    ): FieldDefinition[] => {
-        return fields.map(field => {
-            if (field.id === fieldId) {
-                return { ...field, arrayIterationMode: mode };
-            }
-            if (field.children) {
-                return {
-                    ...field,
-                    children: updateFieldArrayMode(field.children, fieldId, mode),
-                };
-            }
-            return field;
-        });
+    const handleIndexSelectorChange = (fieldId: string, selector: IndexSelector, customIndex?: number) => {
+        updateFieldIndexSelector(fieldId, selector, customIndex);
+    };
+
+    const handleListMappingOpen = (fieldId: string) => {
+        setShowListMappingModal(true, fieldId);
     };
 
     const onConnect = useCallback(
@@ -422,7 +424,7 @@ export function ReactFlowDataMapper() {
     };
 
     const handleGenerateJslt = () => {
-        const jslt = JsltGenerator.generate(sourceSchema, targetSchema, mappings);
+        const jslt = JsltGenerator.generate(sourceSchema, targetSchema, mappings, listMappingConfigs);
         const validation = JsltGenerator.validate(jslt);
         
         setGeneratedJslt(jslt);
@@ -709,6 +711,22 @@ export function ReactFlowDataMapper() {
             >
                 Are you sure you want to reset everything? This will remove source schema, target schema, and all mappings. This action cannot be undone.
             </Modal>
+
+            {showListMappingModal && selectedFieldForListMapping && (
+                <ListMappingModal
+                    isOpen={showListMappingModal}
+                    onClose={() => setShowListMappingModal(false)}
+                    sourceField={sourceSchema?.fields.find(f => f.id === selectedFieldForListMapping)!}
+                    targetField={targetSchema?.fields.find(f => f.id === selectedFieldForListMapping)!}
+                    listMappingConfig={listMappingConfigs.find(config => 
+                        config.sourceArrayPath === sourceSchema?.fields.find(f => f.id === selectedFieldForListMapping)?.path
+                    )}
+                    onSave={(config) => {
+                        addListMappingConfig(config);
+                        setShowListMappingModal(false);
+                    }}
+                />
+            )}
         </PageSection>
     );
 }
