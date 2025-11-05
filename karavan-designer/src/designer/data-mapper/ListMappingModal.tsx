@@ -47,8 +47,8 @@ import { MappingEdge } from './MappingEdge';
 export interface ListMappingModalProps {
     isOpen: boolean;
     onClose: () => void;
-    sourceField: FieldDefinition;
-    targetField: FieldDefinition;
+    sourceField?: FieldDefinition;
+    targetField?: FieldDefinition;
     listMappingConfig?: ListMappingConfig;
     onSave: (config: ListMappingConfig) => void;
 }
@@ -77,7 +77,7 @@ export function ListMappingModal({
 
     // Extract array item fields for mapping (assuming arrays contain objects)
     const getArrayItemFields = (field: FieldDefinition): FieldDefinition[] => {
-        if (!field.isArray || !field.children) {
+        if (!field?.isArray || !field.children) {
             return [];
         }
         
@@ -91,6 +91,10 @@ export function ListMappingModal({
         side: 'source' | 'target', 
         startY: number = 0
     ): Node<FieldNodeData>[] => {
+        if (!fields || fields.length === 0) {
+            return [];
+        }
+        
         return fields.map((field, index) => ({
             id: `${side}-${field.id}`,
             type: 'fieldNode',
@@ -126,7 +130,7 @@ export function ListMappingModal({
 
     // Initialize nodes and edges when modal opens
     React.useEffect(() => {
-        if (isOpen) {
+        if (isOpen && sourceField && targetField) {
             const sourceItemFields = getArrayItemFields(sourceField);
             const targetItemFields = getArrayItemFields(targetField);
             
@@ -175,6 +179,11 @@ export function ListMappingModal({
     }, []);
 
     const handleSave = () => {
+        if (!sourceField?.path || !targetField?.path) {
+            console.error('Source or target field is missing');
+            return;
+        }
+        
         const config: ListMappingConfig = {
             id: listMappingConfig?.id || `list-mapping-${Date.now()}`,
             sourceArrayPath: sourceField.path,
@@ -190,6 +199,11 @@ export function ListMappingModal({
     const handleFitView = () => {
         // This will be handled by ReactFlow's fitView function
     };
+
+    // Don't render modal if required fields are missing
+    if (!sourceField || !targetField) {
+        return null;
+    }
 
     return (
         <Modal
@@ -213,7 +227,7 @@ export function ListMappingModal({
                     <ToolbarContent>
                         <ToolbarItem>
                             <Title headingLevel="h4" size="md">
-                                Map fields from {sourceField.name}[] to {targetField.name}[]
+                                Map fields from {sourceField?.name || 'Source'}[] to {targetField?.name || 'Target'}[]
                             </Title>
                         </ToolbarItem>
                         <ToolbarItem align={{ default: 'alignRight' }}>

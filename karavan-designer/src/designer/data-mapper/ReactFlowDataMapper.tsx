@@ -716,8 +716,8 @@ export function ReactFlowDataMapper() {
                 <ListMappingModal
                     isOpen={showListMappingModal}
                     onClose={() => setShowListMappingModal(false)}
-                    sourceField={sourceSchema?.fields.find(f => f.id === selectedFieldForListMapping)!}
-                    targetField={targetSchema?.fields.find(f => f.id === selectedFieldForListMapping)!}
+                    sourceField={sourceSchema?.fields.find(f => f.id === selectedFieldForListMapping)}
+                    targetField={targetSchema?.fields.find(f => f.isArray) || targetSchema?.fields[0]}
                     listMappingConfig={listMappingConfigs.find(config => 
                         config.sourceArrayPath === sourceSchema?.fields.find(f => f.id === selectedFieldForListMapping)?.path
                     )}
