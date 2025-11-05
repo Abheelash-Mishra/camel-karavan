@@ -65,8 +65,6 @@ interface DataMapperActions {
     updateCustomTargetField: (id: string, updates: Partial<FieldDefinition>) => void;
     setShowAddConstantModal: (show: boolean) => void;
     setShowAddTargetFieldModal: (show: boolean) => void;
-    updateFieldIndexSelector: (fieldId: string, selector: IndexSelector, customIndex?: number) => void;
-    toggleFieldExpanded: (fieldId: string) => void;
     setShowListMappingModal: (show: boolean, fieldId?: string) => void;
     addListMappingConfig: (config: ListMappingConfig) => void;
     updateListMappingConfig: (id: string, config: ListMappingConfig) => void;
@@ -102,18 +100,13 @@ export const useDataMapperStore = create<DataMapperState & DataMapperActions>((s
     ...initialState,
 
     setSourceSchema: (schema) => {
-        // Set default index selector for array fields and initialize expand state
+        // Set default values for fields
         if (schema) {
             const migrateFields = (fields: FieldDefinition[]): FieldDefinition[] => {
                 return fields.map(field => {
                     const migratedField = {
                         ...field,
-                        indexSelector: field.isArray && !field.indexSelector 
-                            ? 'first' as IndexSelector 
-                            : field.indexSelector,
-                        isExpanded: ((field.type === 'object' && !field.isArray) || field.isArray) && field.isExpanded === undefined 
-                            ? false 
-                            : field.isExpanded
+                        isExpanded: true // Always expanded in simplified UI
                     };
                     if (field.children) {
                         migratedField.children = migrateFields(field.children);
@@ -130,15 +123,13 @@ export const useDataMapperStore = create<DataMapperState & DataMapperActions>((s
     },
     
     setTargetSchema: (schema) => {
-        // Set default values for object and array fields
+        // Set default values for fields
         if (schema) {
             const migrateFields = (fields: FieldDefinition[]): FieldDefinition[] => {
                 return fields.map(field => {
                     const migratedField = {
                         ...field,
-                        isExpanded: ((field.type === 'object' && !field.isArray) || field.isArray) && field.isExpanded === undefined 
-                            ? false 
-                            : field.isExpanded
+                        isExpanded: true // Always expanded in simplified UI
                     };
                     if (field.children) {
                         migratedField.children = migrateFields(field.children);
@@ -224,61 +215,6 @@ export const useDataMapperStore = create<DataMapperState & DataMapperActions>((s
     setShowAddConstantModal: (show) => set({ showAddConstantModal: show }),
     
     setShowAddTargetFieldModal: (show) => set({ showAddTargetFieldModal: show }),
-    
-    updateFieldIndexSelector: (fieldId, selector, customIndex) => set((state) => {
-        const updateFieldInSchema = (schema?: SchemaData): SchemaData | undefined => {
-            if (!schema) return schema;
-            const updateField = (field: FieldDefinition): FieldDefinition => {
-                if (field.id === fieldId) {
-                    return { 
-                        ...field, 
-                        indexSelector: selector,
-                        customIndex: selector === 'custom' ? customIndex : undefined
-                    };
-                }
-                if (field.children) {
-                    return { ...field, children: field.children.map(updateField) };
-                }
-                return field;
-            };
-            return {
-                ...schema,
-                fields: schema.fields.map(updateField)
-            };
-        };
-        
-        return {
-            sourceSchema: updateFieldInSchema(state.sourceSchema),
-            targetSchema: updateFieldInSchema(state.targetSchema)
-        };
-    }),
-    
-    toggleFieldExpanded: (fieldId) => set((state) => {
-        const updateFieldInSchema = (schema?: SchemaData): SchemaData | undefined => {
-            if (!schema) return schema;
-            const updateField = (field: FieldDefinition): FieldDefinition => {
-                if (field.id === fieldId) {
-                    return { 
-                        ...field, 
-                        isExpanded: !field.isExpanded
-                    };
-                }
-                if (field.children) {
-                    return { ...field, children: field.children.map(updateField) };
-                }
-                return field;
-            };
-            return {
-                ...schema,
-                fields: schema.fields.map(updateField)
-            };
-        };
-        
-        return {
-            sourceSchema: updateFieldInSchema(state.sourceSchema),
-            targetSchema: updateFieldInSchema(state.targetSchema)
-        };
-    }),
     
     setShowListMappingModal: (show, fieldId) => set({ 
         showListMappingModal: show,

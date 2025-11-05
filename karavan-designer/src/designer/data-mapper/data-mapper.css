@@ -40,6 +40,7 @@
 
 .field-node:hover {
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+    opacity: 0.9;
 }
 
 .field-node.source-field {
@@ -50,6 +51,54 @@
 .field-node.target-field {
     border-left: 3px solid #3e8635;
     background: linear-gradient(to right, #f0f8f0 0%, white 6px);
+}
+
+/* Color coding for different field types */
+.field-node.field-array {
+    background: linear-gradient(to right, #e6f3ff 0%, white 6px);
+    border-left: 4px solid #0066cc;
+}
+
+.field-node.field-object {
+    background: linear-gradient(to right, #e8f5e8 0%, white 6px);
+    border-left: 4px solid #28a745;
+}
+
+.field-node.field-primitive {
+    background: linear-gradient(to right, #f8f8f8 0%, white 6px);
+    border-left: 4px solid #6c757d;
+}
+
+/* Depth-based indentation */
+.field-node.field-depth-1 {
+    margin-left: 20px;
+}
+
+.field-node.field-depth-2 {
+    margin-left: 40px;
+}
+
+.field-node.field-depth-3 {
+    margin-left: 60px;
+}
+
+.field-node.field-depth-4 {
+    margin-left: 80px;
+}
+
+.field-node.field-depth-5 {
+    margin-left: 100px;
+}
+
+/* Warning for deep nesting */
+.field-node.field-depth-warning {
+    border-color: #dc3545 !important;
+    background: linear-gradient(to right, #f8d7da 0%, white 6px) !important;
+}
+
+.field-node.field-depth-warning .field-name {
+    color: #721c24;
+    font-weight: 700;
 }
 
 .field-content {

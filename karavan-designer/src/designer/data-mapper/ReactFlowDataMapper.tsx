@@ -129,8 +129,6 @@ export function ReactFlowDataMapper() {
         removeCustomTargetField,
         setShowAddConstantModal,
         setShowAddTargetFieldModal,
-        updateFieldIndexSelector,
-        toggleFieldExpanded,
         setShowListMappingModal,
         addListMappingConfig,
         clearMappings,
@@ -174,8 +172,6 @@ export function ReactFlowDataMapper() {
             s.removeCustomTargetField,
             s.setShowAddConstantModal,
             s.setShowAddTargetFieldModal,
-            s.updateFieldIndexSelector,
-            s.toggleFieldExpanded,
             s.setShowListMappingModal,
             s.addListMappingConfig,
             s.clearMappings,
@@ -196,76 +192,40 @@ export function ReactFlowDataMapper() {
 
         // Add source schema fields in hierarchical order
         if (sourceSchema) {
-            // Create a helper function to get field depth
-            const getFieldDepth = (field: FieldDefinition): number => {
-                let depth = 0;
-                let currentField = field;
-                while (currentField.parent) {
-                    depth++;
-                    currentField = sourceSchema.fields.find(f => f.id === currentField.parent) || currentField;
-                    if (depth > 10) break; // Prevent infinite loops
-                }
-                return depth;
-            };
-
-            // Check if a field is a child of an array
-            const isChildOfArray = (field: FieldDefinition): boolean => {
-                if (!field.parent) return false;
-                const parentField = sourceSchema.fields.find(f => f.id === field.parent);
-                return parentField?.isArray || false;
-            };
-
-            // Check if a field is a child of an object
-            const isChildOfObject = (field: FieldDefinition): boolean => {
-                if (!field.parent) return false;
-                const parentField = sourceSchema.fields.find(f => f.id === field.parent);
-                return parentField?.type === 'object' && !parentField?.isArray || false;
-            };
-
-            // Check if a field's parent is expanded
-            const isParentExpanded = (field: FieldDefinition): boolean => {
-                if (!field.parent) return false;
-                const parentField = sourceSchema.fields.find(f => f.id === field.parent);
-                return parentField?.isExpanded === true || false;
-            };
-
-            // Filter fields to exclude children unless parent is expanded
-            const visibleFields = sourceSchema.fields.filter(field => {
-                // Show root fields
-                if (!field.parent) return true;
-                // Show children only if parent is expanded (both objects and arrays)
-                if (isChildOfArray(field) || isChildOfObject(field)) return isParentExpanded(field);
-                // Show other fields
-                return true;
-            });
+            // Show all fields (no expand/collapse filtering)
+            const allFields = sourceSchema.fields;
 
             // Create hierarchical ordering where children follow their parents
             const createHierarchicalOrder = (fields: FieldDefinition[]): FieldDefinition[] => {
                 const result: FieldDefinition[] = [];
-                const addFieldWithChildren = (field: FieldDefinition, depth: number = 0) => {
+                const processed = new Set<string>();
+                
+                const addFieldWithChildren = (field: FieldDefinition) => {
+                    if (processed.has(field.id)) return;
+                    
+                    processed.add(field.id);
                     result.push(field);
-                    // If field is expanded, add its visible children immediately after
-                    if (field.isExpanded && field.children) {
+                    
+                    // Always add all children immediately after parent
+                    if (field.children) {
                         field.children.forEach(child => {
-                            if (visibleFields.includes(child)) {
-                                addFieldWithChildren(child, depth + 1);
-                            }
+                            addFieldWithChildren(child);
                         });
                     }
                 };
                 
-                // Start with root fields
+                // Start with root fields (fields without parents)
                 const rootFields = fields.filter(f => !f.parent);
                 rootFields.forEach(field => addFieldWithChildren(field));
                 
                 return result;
             };
 
-            const sortedFields = createHierarchicalOrder(visibleFields);
+            const sortedFields = createHierarchicalOrder(allFields);
 
             sortedFields.forEach((field) => {
-                const depth = getFieldDepth(field);
-                const indentX = 50 + (depth * 20); // Indent child fields
+                const depth = field.depth || 0;
+                const indentX = 50 + (depth * 30); // Increase indent for better visibility
                 
                 newNodes.push({
                     id: `source-${field.id}`,
@@ -274,9 +234,6 @@ export function ReactFlowDataMapper() {
                     data: {
                         field,
                         side: 'source',
-                        onIndexSelectorChange: handleIndexSelectorChange,
-                        onListMappingOpen: handleListMappingOpen,
-                        onExpandToggle: handleExpandToggle,
                     },
                 });
                 sourceYPosition += 80;
@@ -307,76 +264,40 @@ export function ReactFlowDataMapper() {
 
         // Add target schema fields in hierarchical order
         if (targetSchema) {
-            // Create a helper function to get field depth
-            const getFieldDepth = (field: FieldDefinition): number => {
-                let depth = 0;
-                let currentField = field;
-                while (currentField.parent) {
-                    depth++;
-                    currentField = targetSchema.fields.find(f => f.id === currentField.parent) || currentField;
-                    if (depth > 10) break; // Prevent infinite loops
-                }
-                return depth;
-            };
-
-            // Check if a field is a child of an array
-            const isChildOfArray = (field: FieldDefinition): boolean => {
-                if (!field.parent) return false;
-                const parentField = targetSchema.fields.find(f => f.id === field.parent);
-                return parentField?.isArray || false;
-            };
-
-            // Check if a field is a child of an object
-            const isChildOfObject = (field: FieldDefinition): boolean => {
-                if (!field.parent) return false;
-                const parentField = targetSchema.fields.find(f => f.id === field.parent);
-                return parentField?.type === 'object' && !parentField?.isArray || false;
-            };
-
-            // Check if a field's parent is expanded
-            const isParentExpanded = (field: FieldDefinition): boolean => {
-                if (!field.parent) return false;
-                const parentField = targetSchema.fields.find(f => f.id === field.parent);
-                return parentField?.isExpanded === true || false;
-            };
-
-            // Filter fields to exclude children unless parent is expanded
-            const visibleFields = targetSchema.fields.filter(field => {
-                // Show root fields
-                if (!field.parent) return true;
-                // Show children only if parent is expanded (both objects and arrays)
-                if (isChildOfArray(field) || isChildOfObject(field)) return isParentExpanded(field);
-                // Show other fields
-                return true;
-            });
+            // Show all fields (no expand/collapse filtering)
+            const allTargetFields = targetSchema.fields;
 
             // Create hierarchical ordering where children follow their parents
             const createHierarchicalOrderTarget = (fields: FieldDefinition[]): FieldDefinition[] => {
                 const result: FieldDefinition[] = [];
-                const addFieldWithChildren = (field: FieldDefinition, depth: number = 0) => {
+                const processed = new Set<string>();
+                
+                const addFieldWithChildren = (field: FieldDefinition) => {
+                    if (processed.has(field.id)) return;
+                    
+                    processed.add(field.id);
                     result.push(field);
-                    // If field is expanded, add its visible children immediately after
-                    if (field.isExpanded && field.children) {
+                    
+                    // Always add all children immediately after parent
+                    if (field.children) {
                         field.children.forEach(child => {
-                            if (visibleFields.includes(child)) {
-                                addFieldWithChildren(child, depth + 1);
-                            }
+                            addFieldWithChildren(child);
                         });
                     }
                 };
                 
-                // Start with root fields
+                // Start with root fields (fields without parents)
                 const rootFields = fields.filter(f => !f.parent);
                 rootFields.forEach(field => addFieldWithChildren(field));
                 
                 return result;
             };
 
-            const sortedFields = createHierarchicalOrderTarget(visibleFields);
+            const sortedFields = createHierarchicalOrderTarget(allTargetFields);
 
             sortedFields.forEach((field) => {
-                const depth = getFieldDepth(field);
-                const indentX = 600 - (depth * 20); // Indent child fields (right side)
+                const depth = field.depth || 0;
+                const indentX = 600 - (depth * 30); // Indent child fields (right side) with more spacing
                 
                 newNodes.push({
                     id: `target-${field.id}`,
@@ -385,7 +306,6 @@ export function ReactFlowDataMapper() {
                     data: {
                         field,
                         side: 'target',
-                        onExpandToggle: handleExpandToggle,
                     },
                 });
                 targetYPosition += 80;
@@ -480,16 +400,8 @@ export function ReactFlowDataMapper() {
         setEdges(newEdges);
     }, [mappings, sourceSchema, targetSchema]);
 
-    const handleIndexSelectorChange = (fieldId: string, selector: IndexSelector, customIndex?: number) => {
-        updateFieldIndexSelector(fieldId, selector, customIndex);
-    };
-
     const handleListMappingOpen = (fieldId: string) => {
         setShowListMappingModal(true, fieldId);
-    };
-
-    const handleExpandToggle = (fieldId: string) => {
-        toggleFieldExpanded(fieldId);
     };
 
     const onConnect = useCallback(

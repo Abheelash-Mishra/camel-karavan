@@ -17,25 +17,18 @@
 
 import React from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { FieldDefinition, IndexSelector } from './DataMapperTypes';
-import { Button, Badge, Tooltip, MenuToggle, Select, SelectOption, SelectList, TextInput } from '@patternfly/react-core';
-import { TrashIcon, CogIcon, CaretDownIcon, CaretRightIcon } from '@patternfly/react-icons';
+import { FieldDefinition } from './DataMapperTypes';
+import { Button, Badge, Tooltip } from '@patternfly/react-core';
+import { TrashIcon } from '@patternfly/react-icons';
 
 export interface FieldNodeData {
     field: FieldDefinition;
     side: 'source' | 'target';
-    onIndexSelectorChange?: (fieldId: string, selector: IndexSelector, customIndex?: number) => void;
-    onListMappingOpen?: (fieldId: string) => void;
-    onExpandToggle?: (fieldId: string) => void;
     onDelete?: () => void;
 }
 
 export function FieldNode({ data }: NodeProps<FieldNodeData>) {
-    const { field, side, onIndexSelectorChange, onListMappingOpen, onExpandToggle, onDelete } = data;
-    const [showIndexSelector, setShowIndexSelector] = React.useState(true); // Always show for arrays
-    const [showCustomIndex, setShowCustomIndex] = React.useState(false);
-    const [customIndexValue, setCustomIndexValue] = React.useState(field.customIndex || 0);
-    const [isIndexSelectorOpen, setIsIndexSelectorOpen] = React.useState(false);
+    const { field, side, onDelete } = data;
 
     const getTypeColor = (type: string): string => {
         switch (type) {
@@ -48,53 +41,23 @@ export function FieldNode({ data }: NodeProps<FieldNodeData>) {
         }
     };
 
-    const handleIndexSelectorChange = (selector: IndexSelector) => {
-        if (onIndexSelectorChange) {
-            if (selector === 'custom') {
-                setShowCustomIndex(true);
-                onIndexSelectorChange(field.id, selector, customIndexValue);
-            } else {
-                setShowCustomIndex(false);
-                onIndexSelectorChange(field.id, selector);
-            }
-        }
-    };
-
-    const handleCustomIndexChange = (value: string) => {
-        const numValue = parseInt(value, 10);
-        if (!isNaN(numValue) && numValue >= 0) {
-            setCustomIndexValue(numValue);
-            if (onIndexSelectorChange) {
-                onIndexSelectorChange(field.id, 'custom', numValue);
-            }
-        }
-    };
-
-    const getIndexSelectorLabel = (selector?: IndexSelector) => {
-        switch (selector) {
-            case 'first': return 'First';
-            case 'second': return 'Second';
-            case 'third': return 'Third';
-            case 'last': return 'Last';
-            case 'custom': return `[${customIndexValue}]`;
-            default: return 'First'; // Default to First Value
-        }
+    const getFieldBackgroundClass = (type: string, isArray: boolean): string => {
+        if (isArray) return 'field-array';
+        if (type === 'object') return 'field-object';
+        return 'field-primitive';
     };
 
     const indent = (field.path.match(/\./g) || []).length;
     const isSourceNode = side === 'source';
-    const fieldDepth = indent;
+    const fieldDepth = field.depth || indent;
     const isChildField = fieldDepth > 0;
-
-    // Initialize index selector visibility for arrays
-    React.useEffect(() => {
-        setShowIndexSelector(field.isArray && side === 'source');
-        setShowCustomIndex(field.indexSelector === 'custom');
-    }, [field.isArray, field.indexSelector, side]);
+    const depthWarning = fieldDepth > 5 ? ' field-depth-warning' : '';
+    const depthClass = fieldDepth > 0 ? ` field-depth-${Math.min(fieldDepth, 5)}` : '';
+    const backgroundClass = getFieldBackgroundClass(field.type, field.isArray);
 
     return (
         <div 
-            className={`field-node ${side}-field ${isChildField ? 'child-field' : ''}`}
+            className={`field-node ${side}-field ${backgroundClass}${depthClass}${depthWarning} ${isChildField ? 'child-field' : ''}`}
             data-depth={fieldDepth}
             style={{ 
                 minWidth: '200px',
@@ -139,96 +102,19 @@ export function FieldNode({ data }: NodeProps<FieldNodeData>) {
                         {field.isArray && (
                             <Badge className="array-badge">[]</Badge>
                         )}
-                        {((field.type === 'object' && !field.isArray) || field.isArray) && field.children && field.children.length > 0 && onExpandToggle && (
-                            <Tooltip content={field.isExpanded ? "Collapse fields" : "Expand fields"}>
-                                <Button
-                                    variant="plain"
-                                    icon={field.isExpanded ? <CaretDownIcon /> : <CaretRightIcon />}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onExpandToggle(field.id);
-                                    }}
-                                    size="sm"
-                                    style={{ padding: '2px', minWidth: 'auto', marginLeft: '4px' }}
-                                />
-                            </Tooltip>
-                        )}
-                        {field.isArray && side === 'source' && onListMappingOpen && (
-                            <Tooltip content="Configure list mapping">
-                                <Button
-                                    variant="plain"
-                                    icon={<CogIcon />}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onListMappingOpen(field.id);
-                                    }}
-                                    size="sm"
-                                    style={{ padding: '2px', minWidth: 'auto', marginLeft: '4px' }}
-                                />
-                            </Tooltip>
-                        )}
                         <Badge style={{ backgroundColor: `var(--pf-v5-global--palette--${getTypeColor(field.type)}-200)` }}>
                             {field.type}
                         </Badge>
+                        {fieldDepth > 5 && (
+                            <Badge style={{ backgroundColor: 'var(--pf-v5-global--palette--red-200)', color: '#721c24' }}>
+                                Deep: {fieldDepth}
+                            </Badge>
+                        )}
                     </div>
                 </div>
 
                 {field.description && (
                     <div className="field-description">{field.description}</div>
-                )}
-
-                {field.isArray && side === 'source' && (
-                    <div className="array-controls">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Tooltip content="Array element selector">
-                                <span style={{ fontSize: '12px', color: '#666' }}>
-                                    [{getIndexSelectorLabel(field.indexSelector)}]
-                                </span>
-                            </Tooltip>
-
-                            {showIndexSelector && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <Select
-                                        isOpen={isIndexSelectorOpen}
-                                        selected={field.indexSelector || 'first'}
-                                        onSelect={(_, selection) => {
-                                            handleIndexSelectorChange(selection as IndexSelector);
-                                            setIsIndexSelectorOpen(false);
-                                        }}
-                                        onOpenChange={setIsIndexSelectorOpen}
-                                        toggle={(toggleRef) => (
-                                            <MenuToggle
-                                                ref={toggleRef}
-                                                onClick={() => setIsIndexSelectorOpen(!isIndexSelectorOpen)}
-                                                isExpanded={isIndexSelectorOpen}
-                                                style={{ width: '80px' }}
-                                            >
-                                                {getIndexSelectorLabel(field.indexSelector)}
-                                                <CaretDownIcon />
-                                            </MenuToggle>
-                                        )}
-                                    >
-                                        <SelectList>
-                                            <SelectOption value="first">First</SelectOption>
-                                            <SelectOption value="second">Second</SelectOption>
-                                            <SelectOption value="third">Third</SelectOption>
-                                            <SelectOption value="last">Last</SelectOption>
-                                            <SelectOption value="custom">Custom</SelectOption>
-                                        </SelectList>
-                                    </Select>
-                                    {showCustomIndex && (
-                                        <TextInput
-                                            type="number"
-                                            value={customIndexValue.toString()}
-                                            onChange={(_, value) => handleCustomIndexChange(value)}
-                                            style={{ width: '50px' }}
-                                            min={0}
-                                        />
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    </div>
                 )}
             </div>
         </div>

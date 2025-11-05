@@ -37,14 +37,13 @@ export interface FieldDefinition {
     name: string;
     type: FieldType;
     isArray: boolean;
-    indexSelector?: IndexSelector;
-    customIndex?: number;
     listMappingConfig?: ListMappingConfig;
     children?: FieldDefinition[];
     parent?: string;
     description?: string;
     isCustom?: boolean; // For user-added fields
     isExpanded?: boolean; // For array expand/collapse
+    depth?: number; // Depth in the hierarchy for visual styling
 }
 
 export interface ConstantValue {

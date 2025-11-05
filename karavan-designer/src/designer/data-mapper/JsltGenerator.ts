@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-import { FieldDefinition, FieldMapping, SchemaData, IndexSelector, ListMappingConfig } from './DataMapperTypes';
+import { FieldDefinition, FieldMapping, SchemaData, ListMappingConfig } from './DataMapperTypes';
 import { SchemaParser } from './SchemaParser';
 
 export class JsltGenerator {
@@ -184,11 +184,8 @@ export class JsltGenerator {
 
         let expr = this.getJsltPath(sourceField.path);
 
-        // Handle array index access with IndexSelector support
-        if (sourceField.isArray && sourceField.indexSelector) {
-            const indexValue = this.getIndexValue(sourceField.indexSelector, sourceField.customIndex);
-            expr = expr + `[${indexValue}]`;
-        }
+        // Arrays now use direct path access without index selectors in simplified UI
+        // The path already includes proper array notation from SchemaParser
 
         // Apply transformation if specified
         if (mapping.transformation) {
@@ -292,26 +289,6 @@ export class JsltGenerator {
             valid: errors.length === 0,
             errors
         };
-    }
-
-    /**
-     * Get index value from IndexSelector
-     */
-    private static getIndexValue(indexSelector?: IndexSelector, customIndex?: number): string {
-        switch (indexSelector) {
-            case 'first':
-                return '0';
-            case 'second':
-                return '1';
-            case 'third':
-                return '2';
-            case 'last':
-                return '-1';
-            case 'custom':
-                return customIndex !== undefined ? customIndex.toString() : '0';
-            default:
-                return '0'; // Default to first
-        }
     }
 
     /**

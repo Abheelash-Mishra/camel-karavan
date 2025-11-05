@@ -34,7 +34,7 @@ export class SchemaParser {
     /**
      * Parse JSON Schema format
      */
-    private static parseJsonSchema(schema: any, path: string = '', parentId?: string): FieldDefinition[] {
+    private static parseJsonSchema(schema: any, path: string = '', parentId?: string, depth: number = 1): FieldDefinition[] {
         const fields: FieldDefinition[] = [];
 
         if (!schema || typeof schema !== 'object') {
@@ -45,7 +45,7 @@ export class SchemaParser {
         const isArray = type === 'array';
 
         if (type === 'object' && schema.properties) {
-            // Parse object properties
+            // Parse object properties - always include all children
             Object.keys(schema.properties).forEach(propName => {
                 const propSchema = schema.properties[propName];
                 const propPath = path ? `${path}.${propName}` : propName;
@@ -61,18 +61,20 @@ export class SchemaParser {
                     isArray: isPropArray,
                     parent: parentId,
                     description: propSchema.description,
+                    depth: depth,
+                    isExpanded: true, // Always expanded in simplified UI
                 };
 
                 fields.push(field);
 
                 // Recursively parse nested objects or array items
                 if (propType === 'object' && propSchema.properties) {
-                    const children = this.parseJsonSchema(propSchema, propPath, fieldId);
+                    const children = this.parseJsonSchema(propSchema, propPath, fieldId, depth + 1);
                     field.children = children;
                     fields.push(...children);
                 } else if (isPropArray && propSchema.items) {
                     const arrayPath = `${propPath}[]`;
-                    const children = this.parseJsonSchema(propSchema.items, arrayPath, fieldId);
+                    const children = this.parseJsonSchema(propSchema.items, arrayPath, fieldId, depth + 1);
                     field.children = children;
                     fields.push(...children);
                 }
@@ -80,7 +82,7 @@ export class SchemaParser {
         } else if (isArray && schema.items) {
             // Handle root-level arrays
             const arrayPath = path ? `${path}[]` : '[]';
-            const children = this.parseJsonSchema(schema.items, arrayPath, parentId);
+            const children = this.parseJsonSchema(schema.items, arrayPath, parentId, depth + 1);
             fields.push(...children);
         }
 
@@ -90,7 +92,7 @@ export class SchemaParser {
     /**
      * Parse JSON instance/sample
      */
-    private static parseJsonInstance(json: any, path: string = '', parentId?: string): FieldDefinition[] {
+    public static parseJsonInstance(json: any, path: string = '', parentId?: string, depth: number = 1): FieldDefinition[] {
         const fields: FieldDefinition[] = [];
 
         if (json === null || json === undefined) {
@@ -114,31 +116,33 @@ export class SchemaParser {
                     type: isArray ? this.getArrayItemType({ items: value[0] }) : valueType,
                     isArray: isArray,
                     parent: parentId,
+                    depth: depth,
+                    isExpanded: true, // Always expanded in simplified UI
                 };
 
                 fields.push(field);
 
-                // Recursively parse nested structures
-                if (valueType === 'object' && !isArray) {
-                    const children = this.parseJsonInstance(value, propPath, fieldId);
+                // Recursively parse nested structures - always include all children
+                if (valueType === 'object' && !isArray && value !== null) {
+                    const children = this.parseJsonInstance(value, propPath, fieldId, depth + 1);
                     field.children = children;
                     fields.push(...children);
-                } else if (isArray && value.length > 0) {
+                } else if (isArray && value.length > 0 && value[0] !== null) {
                     const arrayPath = `${propPath}[]`;
                     const itemType = this.getJsonInstanceType(value[0]);
                     if (itemType === 'object') {
-                        const children = this.parseJsonInstance(value[0], arrayPath, fieldId);
+                        const children = this.parseJsonInstance(value[0], arrayPath, fieldId, depth + 1);
                         field.children = children;
                         fields.push(...children);
                     }
                 }
             });
-        } else if (Array.isArray(json) && json.length > 0) {
+        } else if (Array.isArray(json) && json.length > 0 && json[0] !== null) {
             // Handle root-level arrays
             const arrayPath = path ? `${path}[]` : '[]';
             const itemType = this.getJsonInstanceType(json[0]);
             if (itemType === 'object') {
-                const children = this.parseJsonInstance(json[0], arrayPath, parentId);
+                const children = this.parseJsonInstance(json[0], arrayPath, parentId, depth + 1);
                 fields.push(...children);
             }
         }
@@ -186,7 +190,9 @@ export class SchemaParser {
      * Get the type of items in an array
      */
     private static getArrayItemType(schema: any): FieldType {
-        if (!schema || !schema.items) return 'unknown';
+        if (!schema || !schema.items) {
+            return 'unknown';
+        }
         
         if (schema.items.type) {
             return this.normalizeJsonSchemaType(schema.items.type);
@@ -194,7 +200,7 @@ export class SchemaParser {
         
         // Try to infer from instance
         const itemType = this.getJsonInstanceType(schema.items);
-        return itemType;
+        return itemType !== 'unknown' ? itemType : 'object'; // Default to object for complex items
     }
 
     /**
