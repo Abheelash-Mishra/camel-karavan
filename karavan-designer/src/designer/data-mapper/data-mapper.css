@@ -299,3 +299,34 @@
     color: #06c;
     font-size: 24px;
 }
+
+/* Hierarchy Visual Indicators */
+.field-node[data-depth="1"] {
+    border-left-width: 2px;
+    margin-left: 20px;
+    background: linear-gradient(to right, rgba(0, 102, 204, 0.05) 0%, white 6px);
+}
+
+.field-node[data-depth="2"] {
+    border-left-width: 1px;
+    margin-left: 40px;
+    background: linear-gradient(to right, rgba(0, 102, 204, 0.03) 0%, white 6px);
+}
+
+.field-node[data-depth="3"] {
+    border-left-width: 1px;
+    margin-left: 60px;
+    background: linear-gradient(to right, rgba(0, 102, 204, 0.02) 0%, white 6px);
+}
+
+/* Parent-child visual connection */
+.field-node.child-field::before {
+    content: "";
+    position: absolute;
+    left: -12px;
+    top: 50%;
+    width: 8px;
+    height: 1px;
+    background-color: #d2d2d2;
+    transform: translateY(-50%);
+}

@@ -37,7 +37,6 @@ export interface FieldDefinition {
     name: string;
     type: FieldType;
     isArray: boolean;
-    arrayIterationMode?: ArrayIterationMode;
     indexSelector?: IndexSelector;
     customIndex?: number;
     listMappingConfig?: ListMappingConfig;
@@ -45,6 +44,7 @@ export interface FieldDefinition {
     parent?: string;
     description?: string;
     isCustom?: boolean; // For user-added fields
+    isExpanded?: boolean; // For array expand/collapse
 }
 
 export interface ConstantValue {

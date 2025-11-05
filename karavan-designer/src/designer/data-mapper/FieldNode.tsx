@@ -17,24 +17,22 @@
 
 import React from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { FieldDefinition, ArrayIterationMode, IndexSelector } from './DataMapperTypes';
+import { FieldDefinition, IndexSelector } from './DataMapperTypes';
 import { Button, Badge, Tooltip, MenuToggle, Select, SelectOption, SelectList, TextInput } from '@patternfly/react-core';
-import { ToggleGroup, ToggleGroupItem } from '@patternfly/react-core';
-import { TrashIcon, CogIcon, CaretDownIcon } from '@patternfly/react-icons';
+import { TrashIcon, CogIcon, CaretDownIcon, CaretRightIcon } from '@patternfly/react-icons';
 
 export interface FieldNodeData {
     field: FieldDefinition;
     side: 'source' | 'target';
-    onArrayModeChange?: (fieldId: string, mode: ArrayIterationMode) => void;
     onIndexSelectorChange?: (fieldId: string, selector: IndexSelector, customIndex?: number) => void;
     onListMappingOpen?: (fieldId: string) => void;
+    onExpandToggle?: (fieldId: string) => void;
     onDelete?: () => void;
 }
 
 export function FieldNode({ data }: NodeProps<FieldNodeData>) {
-    const { field, side, onArrayModeChange, onIndexSelectorChange, onListMappingOpen, onDelete } = data;
-    const [showArrayControl, setShowArrayControl] = React.useState(false);
-    const [showIndexSelector, setShowIndexSelector] = React.useState(false);
+    const { field, side, onIndexSelectorChange, onListMappingOpen, onExpandToggle, onDelete } = data;
+    const [showIndexSelector, setShowIndexSelector] = React.useState(true); // Always show for arrays
     const [showCustomIndex, setShowCustomIndex] = React.useState(false);
     const [customIndexValue, setCustomIndexValue] = React.useState(field.customIndex || 0);
     const [isIndexSelectorOpen, setIsIndexSelectorOpen] = React.useState(false);
@@ -48,14 +46,6 @@ export function FieldNode({ data }: NodeProps<FieldNodeData>) {
             case 'array': return 'cyan';
             default: return 'grey';
         }
-    };
-
-    const handleArrayModeChange = (mode: ArrayIterationMode) => {
-        if (onArrayModeChange) {
-            onArrayModeChange(field.id, mode);
-        }
-        // Show index selector when index-access mode is selected
-        setShowIndexSelector(mode === 'index-access');
     };
 
     const handleIndexSelectorChange = (selector: IndexSelector) => {
@@ -93,19 +83,22 @@ export function FieldNode({ data }: NodeProps<FieldNodeData>) {
 
     const indent = (field.path.match(/\./g) || []).length;
     const isSourceNode = side === 'source';
+    const fieldDepth = indent;
+    const isChildField = fieldDepth > 0;
 
-    // Initialize index selector visibility based on current mode
+    // Initialize index selector visibility for arrays
     React.useEffect(() => {
-        setShowIndexSelector(field.arrayIterationMode === 'index-access');
+        setShowIndexSelector(field.isArray && side === 'source');
         setShowCustomIndex(field.indexSelector === 'custom');
-    }, [field.arrayIterationMode, field.indexSelector]);
+    }, [field.isArray, field.indexSelector, side]);
 
     return (
         <div 
-            className={`field-node ${side}-field`}
+            className={`field-node ${side}-field ${isChildField ? 'child-field' : ''}`}
+            data-depth={fieldDepth}
             style={{ 
-                paddingLeft: `${indent * 12}px`,
-                minWidth: '200px'
+                minWidth: '200px',
+                position: 'relative'
             }}
         >
             {isSourceNode && (
@@ -146,6 +139,20 @@ export function FieldNode({ data }: NodeProps<FieldNodeData>) {
                         {field.isArray && (
                             <Badge className="array-badge">[]</Badge>
                         )}
+                        {((field.type === 'object' && !field.isArray) || field.isArray) && field.children && field.children.length > 0 && onExpandToggle && (
+                            <Tooltip content={field.isExpanded ? "Collapse fields" : "Expand fields"}>
+                                <Button
+                                    variant="plain"
+                                    icon={field.isExpanded ? <CaretDownIcon /> : <CaretRightIcon />}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onExpandToggle(field.id);
+                                    }}
+                                    size="sm"
+                                    style={{ padding: '2px', minWidth: 'auto', marginLeft: '4px' }}
+                                />
+                            </Tooltip>
+                        )}
                         {field.isArray && side === 'source' && onListMappingOpen && (
                             <Tooltip content="Configure list mapping">
                                 <Button
@@ -173,15 +180,10 @@ export function FieldNode({ data }: NodeProps<FieldNodeData>) {
                 {field.isArray && side === 'source' && (
                     <div className="array-controls">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Tooltip content="Choose how to iterate over array elements">
-                                <Button
-                                    variant="link"
-                                    size="sm"
-                                    onClick={() => setShowArrayControl(!showArrayControl)}
-                                >
-                                    {field.arrayIterationMode === 'for-loop' ? 'Loop' : 
-                                     field.arrayIterationMode === 'index-access' ? `[${getIndexSelectorLabel(field.indexSelector)}]` : 'Direct'}
-                                </Button>
+                            <Tooltip content="Array element selector">
+                                <span style={{ fontSize: '12px', color: '#666' }}>
+                                    [{getIndexSelectorLabel(field.indexSelector)}]
+                                </span>
                             </Tooltip>
 
                             {showIndexSelector && (
@@ -226,28 +228,6 @@ export function FieldNode({ data }: NodeProps<FieldNodeData>) {
                                 </div>
                             )}
                         </div>
-
-                        {showArrayControl && (
-                            <div className="array-mode-selector">
-                                <ToggleGroup>
-                                    <ToggleGroupItem
-                                        text="Loop"
-                                        isSelected={field.arrayIterationMode === 'for-loop'}
-                                        onChange={() => handleArrayModeChange('for-loop')}
-                                    />
-                                    <ToggleGroupItem
-                                        text="[0]"
-                                        isSelected={field.arrayIterationMode === 'index-access'}
-                                        onChange={() => handleArrayModeChange('index-access')}
-                                    />
-                                    <ToggleGroupItem
-                                        text="Direct"
-                                        isSelected={field.arrayIterationMode === 'direct'}
-                                        onChange={() => handleArrayModeChange('direct')}
-                                    />
-                                </ToggleGroup>
-                            </div>
-                        )}
                     </div>
                 )}
             </div>

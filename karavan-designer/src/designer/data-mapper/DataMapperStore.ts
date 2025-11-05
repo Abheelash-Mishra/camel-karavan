@@ -16,7 +16,7 @@
  */
 
 import { create } from 'zustand';
-import { FieldMapping, SchemaData, ValidationWarning, ConstantValue, FieldDefinition, ArrayIterationMode, IndexSelector, ListMappingConfig } from './DataMapperTypes';
+import { FieldMapping, SchemaData, ValidationWarning, ConstantValue, FieldDefinition, IndexSelector, ListMappingConfig } from './DataMapperTypes';
 
 interface DataMapperState {
     sourceSchema?: SchemaData;
@@ -65,8 +65,8 @@ interface DataMapperActions {
     updateCustomTargetField: (id: string, updates: Partial<FieldDefinition>) => void;
     setShowAddConstantModal: (show: boolean) => void;
     setShowAddTargetFieldModal: (show: boolean) => void;
-    updateFieldArrayMode: (fieldId: string, mode: ArrayIterationMode) => void;
     updateFieldIndexSelector: (fieldId: string, selector: IndexSelector, customIndex?: number) => void;
+    toggleFieldExpanded: (fieldId: string) => void;
     setShowListMappingModal: (show: boolean, fieldId?: string) => void;
     addListMappingConfig: (config: ListMappingConfig) => void;
     updateListMappingConfig: (id: string, config: ListMappingConfig) => void;
@@ -102,15 +102,18 @@ export const useDataMapperStore = create<DataMapperState & DataMapperActions>((s
     ...initialState,
 
     setSourceSchema: (schema) => {
-        // Migrate existing index-access fields to use 'first' selector by default
+        // Set default index selector for array fields and initialize expand state
         if (schema) {
             const migrateFields = (fields: FieldDefinition[]): FieldDefinition[] => {
                 return fields.map(field => {
                     const migratedField = {
                         ...field,
-                        indexSelector: field.arrayIterationMode === 'index-access' && !field.indexSelector 
+                        indexSelector: field.isArray && !field.indexSelector 
                             ? 'first' as IndexSelector 
-                            : field.indexSelector
+                            : field.indexSelector,
+                        isExpanded: ((field.type === 'object' && !field.isArray) || field.isArray) && field.isExpanded === undefined 
+                            ? false 
+                            : field.isExpanded
                     };
                     if (field.children) {
                         migratedField.children = migrateFields(field.children);
@@ -126,7 +129,30 @@ export const useDataMapperStore = create<DataMapperState & DataMapperActions>((s
         set({ sourceSchema: schema });
     },
     
-    setTargetSchema: (schema) => set({ targetSchema: schema }),
+    setTargetSchema: (schema) => {
+        // Set default values for object and array fields
+        if (schema) {
+            const migrateFields = (fields: FieldDefinition[]): FieldDefinition[] => {
+                return fields.map(field => {
+                    const migratedField = {
+                        ...field,
+                        isExpanded: ((field.type === 'object' && !field.isArray) || field.isArray) && field.isExpanded === undefined 
+                            ? false 
+                            : field.isExpanded
+                    };
+                    if (field.children) {
+                        migratedField.children = migrateFields(field.children);
+                    }
+                    return migratedField;
+                });
+            };
+            schema = {
+                ...schema,
+                fields: migrateFields(schema.fields)
+            };
+        }
+        set({ targetSchema: schema });
+    },
     
     addMapping: (mapping) => set((state) => ({
         mappings: [...state.mappings, mapping]
@@ -199,12 +225,16 @@ export const useDataMapperStore = create<DataMapperState & DataMapperActions>((s
     
     setShowAddTargetFieldModal: (show) => set({ showAddTargetFieldModal: show }),
     
-    updateFieldArrayMode: (fieldId, mode) => set((state) => {
+    updateFieldIndexSelector: (fieldId, selector, customIndex) => set((state) => {
         const updateFieldInSchema = (schema?: SchemaData): SchemaData | undefined => {
             if (!schema) return schema;
             const updateField = (field: FieldDefinition): FieldDefinition => {
                 if (field.id === fieldId) {
-                    return { ...field, arrayIterationMode: mode };
+                    return { 
+                        ...field, 
+                        indexSelector: selector,
+                        customIndex: selector === 'custom' ? customIndex : undefined
+                    };
                 }
                 if (field.children) {
                     return { ...field, children: field.children.map(updateField) };
@@ -223,15 +253,14 @@ export const useDataMapperStore = create<DataMapperState & DataMapperActions>((s
         };
     }),
     
-    updateFieldIndexSelector: (fieldId, selector, customIndex) => set((state) => {
+    toggleFieldExpanded: (fieldId) => set((state) => {
         const updateFieldInSchema = (schema?: SchemaData): SchemaData | undefined => {
             if (!schema) return schema;
             const updateField = (field: FieldDefinition): FieldDefinition => {
                 if (field.id === fieldId) {
                     return { 
                         ...field, 
-                        indexSelector: selector,
-                        customIndex: selector === 'custom' ? customIndex : undefined
+                        isExpanded: !field.isExpanded
                     };
                 }
                 if (field.children) {

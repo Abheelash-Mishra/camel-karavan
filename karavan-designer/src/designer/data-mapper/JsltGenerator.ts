@@ -145,7 +145,7 @@ export class JsltGenerator {
         // Find the array field definition
         const arrayField = fields.find(f => f.path === arrayPath.replace('[]', '') || f.path + '[]' === arrayPath);
         
-        // Determine iteration mode from first mapped child
+        // Determine if we have list mapping configuration
         const childMappings = mappings.filter(m => {
             const targetField = fields.find(f => f.id === m.targetFieldId);
             return targetField && targetField.path.startsWith(arrayPath);
@@ -155,34 +155,16 @@ export class JsltGenerator {
             return '[]';
         }
 
-        const firstMapping = childMappings[0];
-        const sourceField = sourceFields.find(f => f.id === firstMapping.sourceFieldIds[0]);
+        // For now, use simple array element access
+        const itemFields = fields.filter(f => f.path.startsWith(arrayPath));
         
-        // Check if source is also an array and has for-loop mode
-        const useForLoop = sourceField?.isArray && sourceField.arrayIterationMode === 'for-loop';
-
-        if (useForLoop && sourceField) {
-            // Use for-loop syntax
-            const sourceArrayPath = this.getJsltPath(sourceField.path);
-            const itemVar = this.getArrayItemVariable(sourceField.path);
-            
-            // Build object structure for each item
-            const itemFields = fields.filter(f => f.path.startsWith(arrayPath) && f.parent);
-            const itemMapping = this.buildObjectMapping(itemFields, mappings, sourceFields, arrayPath);
-            
-            return `[for (${sourceArrayPath}) ${itemMapping}]`;
+        if (itemFields.length > 1 || itemFields.some(f => f.type === 'object')) {
+            // Array of objects
+            return `[${this.buildObjectMapping(itemFields, mappings, sourceFields, arrayPath)}]`;
         } else {
-            // Use index access or direct mapping
-            const itemFields = fields.filter(f => f.path.startsWith(arrayPath));
-            
-            if (itemFields.length > 1 || itemFields.some(f => f.type === 'object')) {
-                // Array of objects
-                return `[${this.buildObjectMapping(itemFields, mappings, sourceFields, arrayPath)}]`;
-            } else {
-                // Simple array - direct mapping
-                const mapping = childMappings[0];
-                return this.buildMappingExpression(mapping, sourceFields);
-            }
+            // Simple array - direct mapping
+            const mapping = childMappings[0];
+            return this.buildMappingExpression(mapping, sourceFields);
         }
     }
 
@@ -203,7 +185,7 @@ export class JsltGenerator {
         let expr = this.getJsltPath(sourceField.path);
 
         // Handle array index access with IndexSelector support
-        if (sourceField.isArray && sourceField.arrayIterationMode === 'index-access') {
+        if (sourceField.isArray && sourceField.indexSelector) {
             const indexValue = this.getIndexValue(sourceField.indexSelector, sourceField.customIndex);
             expr = expr + `[${indexValue}]`;
         }
