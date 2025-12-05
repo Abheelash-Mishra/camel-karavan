@@ -347,6 +347,16 @@ export function getDesignerIcon(icon: string): React.JSX.Element {
             </g>
         </svg>
     )
+    if (icon === 'data-mapper') return (
+        <svg className="top-icon" width="32px" height="32px" viewBox="0 0 32 32" id="icon">
+            <path d="M6 6h10v2H6zM6 14h10v2H6zM6 22h10v2H6zM19 10h2v4h4l-5 5-5-5h4zM26 24h-9v-2h9z"/>
+            <path
+                d="M0 0h32v32H0z"
+                data-name="&lt;Transparent Rectangle&gt;"
+                style={{fill: "none"}}
+            />
+        </svg>
+    )
     if (icon === 'dependencies') return (
         <svg className="top-icon" width="32px" height="32px" viewBox="0 0 32 32" id="icon">
             <title>application</title>

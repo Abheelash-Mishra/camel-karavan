@@ -227,7 +227,7 @@ type DesignerState = {
     propertyPlaceholders: string[]
     parameterPlaceholders: [string, string][], // route template parameters
     beans: BeanFactoryDefinition[],
-    tab?: "routes" | "rest" | "beans" | "kamelet" | "code"
+    tab?: "routes" | "rest" | "beans" | "kamelet" | "data-mapper" | "code"
 }
 
 const designerState: DesignerState = {
@@ -278,7 +278,7 @@ type DesignerAction = {
     setPropertyPlaceholders: (propertyPlaceholders: string[]) => void;
     setParameterPlaceholders: (parameterPlaceholders: [string, string][]) => void;
     setBeans: (beans: BeanFactoryDefinition[]) => void;
-    setTab: (tab?: "routes" | "rest" | "beans" | "kamelet" | "code") => void;
+    setTab: (tab?: "routes" | "rest" | "beans" | "kamelet" | "data-mapper" | "code") => void;
 }
 
 export const useDesignerStore = createWithEqualityFn<DesignerState & DesignerAction>((set) => ({
@@ -372,7 +372,7 @@ export const useDesignerStore = createWithEqualityFn<DesignerState & DesignerAct
             return {beans: [...beans]};
         })
     },
-    setTab: (tab?: "routes" | "rest" | "beans" | "kamelet" | "code")  => {
+    setTab: (tab?: "routes" | "rest" | "beans" | "kamelet" | "data-mapper" | "code")  => {
         set({tab: tab})
     },
 }), shallow)

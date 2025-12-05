@@ -42,13 +42,7 @@ export class JsltGenerator {
 
         // Build the target structure
         const jslt = this.buildTargetStructure(targetFields, mappings, sourceFields, listMappingConfigs);
-        // Log generated JSLT for debugging
-        // eslint-disable-next-line no-console
-        console.log('[JsltGenerator] Generated JSLT:\n' + jslt);
-        const validation = this.validate(jslt);
-        // eslint-disable-next-line no-console
-        console.log('[JsltGenerator] Validation', validation);
-
+        
         return jslt;
     }
 
@@ -67,27 +61,17 @@ export class JsltGenerator {
             return '.';
         }
 
-        // Find which root fields have mappings under them
-        const rootsWithMappings = rootFields.filter(root => {
-            return mappings.some(m => {
-                const target = targetFields.find(f => f.id === m.targetFieldId);
-                return !!(target && target.path && target.path.startsWith(root.path || ''));
-            });
-        });
+        // Check if root contains an array field
+        const hasRootArray = rootFields.some(f => f.type === 'array');
 
-        // If no root field has mappings, build the full object mapping (all roots)
-        if (rootsWithMappings.length === 0) {
+        if (hasRootArray) {
+            // find first root array path to use as arrayPath
+            const arrayField = rootFields.find(f => f.type === 'array');
+            const arrayPath = arrayField ? arrayField.path : '';
+            return this.buildArrayMapping(targetFields, mappings, sourceFields, arrayPath);
+        } else {
             return this.buildObjectMapping(targetFields, mappings, sourceFields, '');
         }
-
-        // If exactly one mapped root exists and it's an array, build array mapping for it
-        if (rootsWithMappings.length === 1 && rootsWithMappings[0].type === 'array') {
-            const arrayPath = rootsWithMappings[0].path || '';
-            return this.buildArrayMapping(targetFields, mappings, sourceFields, arrayPath);
-        }
-
-        // Otherwise build a top-level object mapping including all mapped root properties
-        return this.buildObjectMapping(targetFields, mappings, sourceFields, '');
     }
 
     /**
@@ -100,41 +84,13 @@ export class JsltGenerator {
         pathPrefix: string,
         listMappingConfigs: ListMappingConfig[] = []
     ): string {
-        // Debug: print context to help diagnose empty outputs
-        // eslint-disable-next-line no-console
-        console.log('[JsltGenerator] buildObjectMapping prefix=', pathPrefix, 'mappings=', mappings.map(m=>m.id));
         const lines: string[] = ['{'];
         const mappedFields = new Map<string, FieldDefinition>();
 
         // Determine direct children using parent links and optional pathPrefix
         const parentField = pathPrefix ? fields.find(f => f.path === pathPrefix) : undefined;
-        // eslint-disable-next-line no-console
-        console.log('[JsltGenerator] parentField=', parentField && { id: parentField.id, path: parentField.path, name: parentField.name });
         const parentId = parentField ? parentField.id : undefined;
         const directChildren = fields.filter(f => f.parent === parentId);
-        // eslint-disable-next-line no-console
-        console.log('[JsltGenerator] directChildren=', directChildren.map(d => ({ id: d.id, name: d.name, path: d.path })));
-
-        // If the requested pathPrefix points to a field itself (no direct children), include mapping for that field
-        if (parentField && directChildren.length === 0) {
-            const parentMappings = mappings.filter(m => m.targetFieldId === parentField.id);
-            if (parentMappings.length > 0) {
-                const mapping = parentMappings[0];
-                const mappingExpr = this.buildMappingExpression(mapping, sourceFields);
-
-                if (parentField.isArray) {
-                    // Attempt to build array mapping for this array field
-                    const arrayExpr = this.buildArrayMapping(fields, mappings, sourceFields, parentField.path);
-                    lines.push(`  "${parentField.name}": ${arrayExpr},`);
-                } else if (parentField.type === 'object') {
-                    // If the parent is an object but has no children, fall back to the mapping expression
-                    lines.push(`  "${parentField.name}": ${mappingExpr},`);
-                } else {
-                    // Simple primitive field
-                    lines.push(`  "${parentField.name}": ${mappingExpr},`);
-                }
-            }
-        }
 
         directChildren.forEach(field => {
             const fieldMappings = mappings.filter(m => m.targetFieldId === field.id);
@@ -192,59 +148,36 @@ export class JsltGenerator {
             return this.buildObjectMapping(fields, mappings, sourceFields, '');
         }
 
-        // Normalize array path (strip trailing wildcard if present)
-        const normalized = arrayPath.replace(/\/\*$/, '');
-
-        // Find the array field by exact path or by type/containment as a fallback
-        let arrayField = fields.find(f => f.path === arrayPath || f.path === normalized);
-        if (!arrayField) {
-            arrayField = fields.find(f => f.type === 'array' && (f.path === normalized || f.path.startsWith(normalized + '/')));
-        }
-        if (!arrayField) {
-            arrayField = fields.find(f => f.type === 'array' && f.path.includes(normalized));
-        }
-
-        if (!arrayField) {
-            return '[]';
-        }
-
-        // Determine all descendant fields under this array (items and deeper)
-        const descendantFields = fields.filter(f => f.path !== arrayField.path && f.path.startsWith(normalized));
-
-        if (descendantFields.length === 0) {
-            return '[]';
-        }
-
-        // Determine mappings that target fields under this array (use normalized path)
+        // Determine mappings that target fields under this array path
         const childMappings = mappings.filter(m => {
             const targetField = fields.find(f => f.id === m.targetFieldId);
-            return targetField && targetField.path.startsWith(normalized);
+            return targetField && targetField.path.startsWith(arrayPath);
         });
 
+        // If no child mappings found, return an empty array literal
         if (childMappings.length === 0) {
             return '[]';
         }
 
-        // Find the item node (the child whose parent is the array field)
-        let itemNode = fields.find(f => f.parent === arrayField!.id);
-        if (!itemNode) {
-            // fallback heuristics: look for a descendant with a wildcard or 'items' in the path
-            itemNode = descendantFields.find(f => f.path === `${normalized}/*`) || descendantFields.find(f => f.path.includes(`${normalized}/items`)) || descendantFields.find(f => f.path.includes('*')) || descendantFields[0];
+        // Collect item-level fields (children of the array's item node)
+        const itemFields = fields.filter(f => f.path !== arrayPath && f.path.startsWith(arrayPath));
+
+        if (itemFields.length === 0) {
+            return '[]';
         }
 
-        const itemNodePath = itemNode ? itemNode.path : normalized;
-
-        // If item node or its descendants contain objects, build array of objects using the item node as the root
-        const itemDescendants = fields.filter(f => f.path !== itemNodePath && f.path.startsWith(itemNodePath));
-        if (itemDescendants.some(f => f.type === 'object')) {
-            const inner = this.buildObjectMapping(fields, mappings, sourceFields, itemNodePath);
-            return `[for (${this.getJsltPath(normalized)}) ${inner}]`;
+        // If itemFields include objects, build array of objects
+        if (itemFields.some(f => f.type === 'object')) {
+            const inner = this.buildObjectMapping(itemFields, mappings, sourceFields, arrayPath);
+            const arrayPointer = arrayPath.replace(/\/\*$/, '');
+            return `[for (${this.getJsltPath(arrayPointer)}) ${inner}]`;
         }
 
-        // Otherwise treat as simple array of values: pick the first mapping expression that maps into this array
+        // Otherwise simple array elements - pick the first mapping expression
         const mapping = childMappings[0];
         const expr = this.buildMappingExpression(mapping, sourceFields);
-        return `[for (${this.getJsltPath(normalized)}) ${expr}]`;
+        const arrayPointer = arrayPath.replace(/\/\*$/, '');
+        return `[for (${this.getJsltPath(arrayPointer)}) ${expr}]`;
     }
 
     /**

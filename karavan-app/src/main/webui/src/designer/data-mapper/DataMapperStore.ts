@@ -26,7 +26,7 @@ interface DataMapperState {
     generatedJslt: string;
     selectedMapping?: string;
     showUploadModal: boolean;
-    uploadModalType: 'source' | 'target' | 'jslt';
+    uploadModalType: 'source' | 'target';
     showJsltEditorModal: boolean;
     showTransformationPopup: boolean;
     showMultiSourcePopup: boolean;
@@ -53,7 +53,7 @@ interface DataMapperActions {
     clearValidationWarnings: () => void;
     setGeneratedJslt: (jslt: string) => void;
     setSelectedMapping: (id?: string) => void;
-    setShowUploadModal: (show: boolean, type?: 'source' | 'target' | 'jslt') => void;
+    setShowUploadModal: (show: boolean, type?: 'source' | 'target') => void;
     setShowJsltEditorModal: (show: boolean) => void;
     setShowTransformationPopup: (show: boolean, mappingId?: string) => void;
     setShowMultiSourcePopup: (show: boolean, targetFieldId?: string) => void;

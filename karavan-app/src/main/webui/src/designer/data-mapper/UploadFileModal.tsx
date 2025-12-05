@@ -107,14 +107,14 @@ export function UploadFileModal({ isOpen, title, onClose, onUpload }: UploadFile
                 <FormGroup label="Schema Type" fieldId="schema-type">
                     <ToggleGroup>
                         <ToggleGroupItem
-                            text="JSON Schema"
-                            isSelected={schemaType === 'json-schema'}
-                            onChange={() => setSchemaType('json-schema')}
-                        />
-                        <ToggleGroupItem
                             text="Sample JSON"
                             isSelected={schemaType === 'json-instance'}
                             onChange={() => setSchemaType('json-instance')}
+                        />
+                        <ToggleGroupItem
+                            text="JSON Schema"
+                            isSelected={schemaType === 'json-schema'}
+                            onChange={() => setSchemaType('json-schema')}
                         />
                     </ToggleGroup>
                 </FormGroup>

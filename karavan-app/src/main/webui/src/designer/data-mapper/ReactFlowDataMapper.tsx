@@ -533,7 +533,7 @@ export function ReactFlowDataMapper() {
                         <Button
                             variant="secondary"
                             icon={<PlusCircleIcon />}
-                            onClick={() => setShowUploadModal(true, 'jslt')}
+                            onClick={() => setShowUploadModal(true, 'source')}
                             isDisabled={!hasSchemas}
                         >
                             Upload JSLT
@@ -642,9 +642,9 @@ export function ReactFlowDataMapper() {
 
             <UploadFileModal
                 isOpen={showUploadModal}
-                title={uploadModalType === 'source' ? 'Upload Source Schema' : (uploadModalType === 'target' ? 'Upload Target Schema' : 'Upload JSLT')}
+                title={uploadModalType === 'source' ? 'Upload Source Schema' : 'Upload Target Schema'}
                 onClose={() => setShowUploadModal(false)}
-                onUpload={uploadModalType === 'source' ? handleUploadSource : (uploadModalType === 'target' ? handleUploadTarget : handleUploadJslt)}
+                onUpload={uploadModalType === 'source' ? handleUploadSource : handleUploadTarget}
             />
 
             <JsltEditorModal

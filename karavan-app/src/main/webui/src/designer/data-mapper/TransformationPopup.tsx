@@ -25,7 +25,6 @@ import {
     FormSelect,
     FormSelectOption,
     TextArea,
-    TextInput,
     Card,
     CardBody,
     CardTitle,
@@ -60,13 +59,13 @@ export function TransformationPopup({
     onEditMultiSource
 }: TransformationPopupProps) {
     const [selectedFunction, setSelectedFunction] = useState(currentMapping?.transformation?.name || '');
-    const [parameters, setParameters] = useState<string[]>(
-        currentMapping?.transformation?.parameters || []
+    const [parameters, setParameters] = useState(
+        currentMapping?.transformation?.parameters?.join(', ') || ''
     );
 
     React.useEffect(() => {
         setSelectedFunction(currentMapping?.transformation?.name || '');
-        setParameters(currentMapping?.transformation?.parameters || []);
+        setParameters(currentMapping?.transformation?.parameters?.join(', ') || '');
     }, [currentMapping, isOpen]);
 
     const handleApply = () => {
@@ -75,7 +74,7 @@ export function TransformationPopup({
         } else {
             const transformation: TransformationFunction = {
                 name: selectedFunction,
-                parameters: parameters && parameters.length > 0 ? parameters.map(p => p?.toString()) : undefined,
+                parameters: parameters ? parameters.split(',').map((p: string) => p.trim()).filter((p: string) => p) : undefined,
             };
             onApply(transformation);
         }
@@ -243,52 +242,25 @@ export function TransformationPopup({
                                 <strong>Example:</strong> {selectedFunctionDef.example}
                             </HelperTextItem>
                         </HelperText>
-                        {selectedFunctionDef.params && selectedFunctionDef.params.length > 0 ? (
-                            <>
-                                {selectedFunctionDef.params.map((p, idx) => (
-                                    <FormGroup key={p.name} label={p.name} fieldId={`param-${idx}`} style={{ marginTop: 8 }}>
-                                        <TextInput
-                                            id={`param-${idx}`}
-                                            value={(parameters[idx] ?? p.default) || ''}
-                                            onChange={(value: any, event?: any) => {
-                                                // PatternFly/TextInput onChange may pass either:
-                                                // - (value: string, event)
-                                                // - (event) where the event is the first arg
-                                                let v: string;
-                                                if (typeof value === 'string') {
-                                                    v = value;
-                                                } else if (value && (value.currentTarget || value.target)) {
-                                                    // value is an event-like object
-                                                    const tgt = (value.currentTarget || value.target) as any;
-                                                    v = tgt && typeof tgt.value === 'string' ? tgt.value : String(tgt && tgt.value || '');
-                                                } else if (event && (event.currentTarget || event.target)) {
-                                                    const tgt = (event.currentTarget || event.target) as any;
-                                                    v = tgt && typeof tgt.value === 'string' ? tgt.value : String(tgt && tgt.value || '');
-                                                } else {
-                                                    v = String(value == null ? '' : value);
-                                                }
 
-                                                const next = [...parameters];
-                                                next[idx] = v;
-                                                setParameters(next);
-                                            }}
-                                            placeholder={p.placeholder || ''}
-                                        />
-                                        <HelperText>
-                                            <HelperTextItem>
-                                                {p.description}
-                                            </HelperTextItem>
-                                        </HelperText>
-                                    </FormGroup>
-                                ))}
-                            </>
-                        ) : (
-                            <HelperText style={{ marginTop: '8px' }}>
+                        <FormGroup 
+                            label="Parameters" 
+                            fieldId="parameters"
+                            style={{ marginTop: '8px' }}
+                        >
+                            <TextArea
+                                id="parameters"
+                                value={parameters}
+                                onChange={(_event, value) => setParameters(value)}
+                                placeholder='Enter parameters separated by commas, e.g., ",", 0, 5'
+                                rows={2}
+                            />
+                            <HelperText>
                                 <HelperTextItem>
-                                    This function does not require additional parameters.
+                                    Enter additional parameters separated by commas (first parameter is the field value)
                                 </HelperTextItem>
                             </HelperText>
-                        )}
+                        </FormGroup>
                     </>
                 )}
             </Form>
