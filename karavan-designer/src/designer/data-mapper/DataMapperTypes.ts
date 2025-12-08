@@ -29,6 +29,7 @@ export interface ListMappingConfig {
     targetArrayPath: string;
     fieldMappings: FieldMapping[];
     nestedLevel: number; // Support up to 3 levels of nesting
+    description?: string; // optional label for UI
 }
 
 export interface FieldDefinition {
@@ -124,5 +125,9 @@ export const JSLT_FUNCTIONS: JsltFunctionDef[] = [
     { name: 'round', description: 'Rounds to nearest integer', example: 'round(.)' },
     { name: 'floor', description: 'Rounds down', example: 'floor(.)' },
     { name: 'ceiling', description: 'Rounds up', example: 'ceiling(.)' },
+
+    { name: 'keys', description: 'Returns keys of an object', example: 'keys(.)' },
+    { name: 'values', description: 'Returns values of an object', example: 'values(.)' },
+    { name: 'type', description: 'Returns the JSON type of a value', example: 'type(.)' }
 ];
 

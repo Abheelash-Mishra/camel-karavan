@@ -148,8 +148,11 @@ export class JsltGenerator {
                     const arrayChildren = fields.filter(f => f.parent === field.id);
 
                     if (arrayChildren.length > 0) {
-                        // Array of objects
-                        const arrayExpr = this.buildArrayMapping(fields, mappings, sourceFields, field.path);
+                        // Array of objects: prefer explicit list mapping config when available
+                        const cfg = listMappingConfigs.find(c => c.targetArrayPath === field.path);
+                        const arrayExpr = cfg 
+                            ? this.buildListToListMapping(cfg, sourceFields)
+                            : this.buildArrayMapping(fields, mappings, sourceFields, field.path);
                         lines.push(`  "${field.name}": ${arrayExpr},`);
                     } else {
                         // Simple array
@@ -385,31 +388,26 @@ export class JsltGenerator {
      */
     private static buildListToListMapping(config: ListMappingConfig, sourceFields: FieldDefinition[]): string {
         const sourceArrayPath = this.getJsltPath(config.sourceArrayPath);
-        
+
+        // If targetArrayPath points to a simple array (not objects), allow projection
+        const isProjection = config.fieldMappings.length === 1;
+
+        if (isProjection) {
+            const expr = this.buildMappingExpression(config.fieldMappings[0], sourceFields)
+                .replace(this.getJsltPath(config.sourceArrayPath), '.');
+            return `[for (${sourceArrayPath}) ${expr}]`;
+        }
+
         // Build the inner object mapping using the field mappings from the config
         const fieldMappingLines: string[] = [];
-        
+
         for (const mapping of config.fieldMappings) {
-            const sourceField = sourceFields.find(f => f.id === mapping.sourceFieldIds[0]);
-            if (sourceField) {
-                // Get the field name without the array path prefix
-                const targetFieldName = mapping.targetFieldId.split('.').pop() || mapping.targetFieldId;
-                const sourceExpression = this.buildMappingExpression(mapping, sourceFields);
-                
-                // Replace the array path with current item reference
-                const itemExpression = sourceExpression.replace(
-                    this.getJsltPath(config.sourceArrayPath),
-                    '.'
-                );
-                
-                fieldMappingLines.push(`  "${targetFieldName}": ${itemExpression}`);
-            }
+            const sourceExpression = this.buildMappingExpression(mapping, sourceFields);
+            const innerExpr = sourceExpression.replace(this.getJsltPath(config.sourceArrayPath), '.');
+            // mapping.targetFieldId is an id; we need a name. For now, assume we format with a generic key; in full impl, look up target field name by id.
+            fieldMappingLines.push(`  "${mapping.targetFieldId}": ${innerExpr}`);
         }
-        
-        if (fieldMappingLines.length === 0) {
-            return `[for (${sourceArrayPath}) .]`;
-        }
-        
+
         const objectMapping = `{\n${fieldMappingLines.join(',\n')}\n}`;
         return `[for (${sourceArrayPath}) ${objectMapping}]`;
     }

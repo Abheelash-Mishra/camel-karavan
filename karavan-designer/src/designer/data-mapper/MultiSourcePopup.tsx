@@ -60,10 +60,18 @@ export function MultiSourcePopup({
         return undefined;
     };
 
-    // Get actual field paths for placeholders
+    // Get actual field paths for placeholders (convert JSON Pointer style to dot-style for display)
     const getFieldPath = (fieldId: string): string => {
         const field = findFieldById(fieldId, sourceFields);
-        return field?.path || fieldId;
+        const p = field?.path || fieldId;
+        // Convert JSON Pointer '/order/id' -> '.order.id' for display
+        if (typeof p === 'string' && p.startsWith('/')) {
+            const body = p.replace(/^\//, '').replace(/\//g, '.');
+            return body.startsWith('.') ? body : `.${body}`;
+        }
+        // Fallback: convert dot-array notation or other separators and ensure leading dot
+        const converted = String(p).replace(/\[\]/g, '').replace(/\//g, '.');
+        return converted.startsWith('.') ? converted : `.${converted}`;
     };
 
     const sourcePlaceholders = sourceFieldIds.map((id, index) => ({
@@ -73,8 +81,7 @@ export function MultiSourcePopup({
 
     React.useEffect(() => {
         if (isOpen && !currentExpression) {
-            // Generate default template using actual field paths
-            const template = sourcePlaceholders.map(s => s.actualPath).join(' + " " + ');
+            const template = sourcePlaceholders.map(s => s.placeholder).join(' + " " + ');
             setExpression(template);
         } else {
             setExpression(currentExpression || '');

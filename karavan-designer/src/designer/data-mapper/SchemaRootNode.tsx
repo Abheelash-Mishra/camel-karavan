@@ -67,32 +67,32 @@ export function SchemaRootNode({ data }: { data: SchemaRootNodeData }) {
         return children.map(field => (
             <div key={field.id} style={{ display: 'block' }}>
                 <div style={{ paddingLeft: depth * INDENT, display: 'flex', alignItems: 'center', position: 'relative', paddingTop: 6, paddingBottom: 6, borderRadius: 4, background: depth % 2 === 0 ? 'rgba(0,0,0,0.02)' : 'transparent' }}>
-                    {/* Render handle only for primitives. Position handlers vertically based on index. */}
-                    {isPrimitive(field.type) && (
+                    {/* Render handle for primitives and arrays to allow array→array connections. */}
+                    {(isPrimitive(field.type) || field.isArray) && (
                         <Handle
                             type={side === 'source' ? 'source' : 'target'}
                             position={side === 'source' ? Position.Right : Position.Left}
                             id={field.path}
                             style={{
-                                background: '#555',
+                                background: field.isArray ? '#c06' : '#555',
                                 width: 10,
                                 height: 10,
                                 // center vertically within the row
                                 top: '50%',
                                 transform: 'translateY(-50%)',
-                                marginRight: 10,
+                                marginRight: 8,
                             }}
                         />
                     )}
 
                     {!isPrimitive(field.type) && (
-                        <button onClick={() => toggle(field.id)} style={{ marginRight: 0, border: 'none', background: 'none', cursor: 'pointer' }}>
+                        <Button variant="plain" onClick={() => toggle(field.id)} style={{ marginRight: 8 }}>
                             {expanded[field.id] ? '-' : '+'}
-                        </button>
+                        </Button>
                     )}
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                        <div style={{ marginLeft: 10 }}>{field.name}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ marginLeft: 6 }}>{field.name}</div>
                         {field.isArray && <Badge className="array-badge">[]</Badge>}
                         <div style={{ color: '#666', fontSize: 11 }}>{field.type}</div>
                     </div>
@@ -100,7 +100,7 @@ export function SchemaRootNode({ data }: { data: SchemaRootNodeData }) {
 
                 {/* Render nested children below (vertical expansion) when expanded */}
                 {(!isPrimitive(field.type) && expanded[field.id]) && (
-                    <div style={{ marginTop: 4, marginLeft: INDENT }}>
+                    <div style={{ marginTop: 4 }}>
                         {renderChildren(field.id, depth + 1)}
                     </div>
                 )}
@@ -108,8 +108,10 @@ export function SchemaRootNode({ data }: { data: SchemaRootNodeData }) {
         ));
     };
 
+    // No DOM measurement — handles are centered inside each row using CSS
+
     return (
-        <div style={{ padding: 8, minWidth: 280, background: '#fff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 6, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+        <div style={{ padding: 8, minWidth: 280, maxWidth: 380, background: '#fff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 6, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
             <div style={{ fontWeight: 700, marginBottom: 8 }}>{data.side === 'source' ? 'Source' : 'Target'}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {renderChildren(undefined, 0)}

@@ -62,6 +62,7 @@ import { useDataMapperStore } from './DataMapperStore';
 import { ListMappingModal } from './ListMappingModal';
 import { FieldNode, FieldNodeData } from './FieldNode';
 import SchemaRootNode, { SchemaRootNodeData } from './SchemaRootNode';
+import LoopScopeNode, { LoopScopeNodeData } from './LoopScopeNode';
 import { MappingEdge, MappingEdgeData } from './MappingEdge';
 import { UploadFileModal } from './UploadFileModal';
 import { JsltEditorModal } from './JsltEditorModal';
@@ -85,6 +86,7 @@ import {
 const nodeTypes = {
     fieldNode: FieldNode,
     schemaRoot: SchemaRootNode,
+    loopScope: LoopScopeNode,
 };
 
 const edgeTypes = {
@@ -188,7 +190,7 @@ export function ReactFlowDataMapper() {
 
     // Generate nodes from schemas
     useEffect(() => {
-        const newNodes: Node<FieldNodeData | SchemaRootNodeData>[] = [];
+        const newNodes: Node<FieldNodeData | SchemaRootNodeData | LoopScopeNodeData>[] = [];
         // Create a single root node for source schema
         if (sourceSchema) {
             newNodes.push({
@@ -254,12 +256,28 @@ export function ReactFlowDataMapper() {
             customY += 80;
         });
 
+        // Add loop scope nodes for listMappingConfigs
+        let loopY = 150;
+        listMappingConfigs.forEach(cfg => {
+            newNodes.push({
+                id: `loop-${cfg.id}`,
+                type: 'loopScope',
+                position: { x: 350, y: loopY },
+                data: {
+                    sourceArrayPath: cfg.sourceArrayPath,
+                    targetArrayPath: cfg.targetArrayPath,
+                    description: cfg.description || '[for (...) ...]'
+                }
+            } as Node<LoopScopeNodeData>);
+            loopY += 120;
+        });
+
         setNodes(newNodes);
         // Debug: log generated nodes to help verify single-root behavior
         // (remove these logs after verification)
         // eslint-disable-next-line no-console
         console.log('[DataMapper] Generated nodes:', newNodes.map(n => n.id));
-    }, [sourceSchema, targetSchema, constants, customTargetFields]);
+    }, [sourceSchema, targetSchema, constants, customTargetFields, listMappingConfigs]);
 
     // Generate edges from mappings
     useEffect(() => {
@@ -376,6 +394,13 @@ export function ReactFlowDataMapper() {
 
             if (!sourceFieldId) return;
 
+            // Array → Array: establish loop scope/list mapping config
+            const sourceFieldObj = sourceSchema?.fields.find(f => f.id === sourceFieldId);
+            if (sourceFieldObj?.isArray && targetField.isArray) {
+                setShowListMappingModal(true, sourceFieldId);
+                return;
+            }
+
             // Check if target already has mappings
             const existingMappings = mappings.filter(m => m.targetFieldId === targetFieldId);
 
@@ -398,7 +423,7 @@ export function ReactFlowDataMapper() {
                 addMapping(newMapping);
             }
         },
-        [mappings, addMapping, updateMapping, setShowMultiSourcePopup, sourceSchema, targetSchema]
+        [mappings, addMapping, updateMapping, setShowMultiSourcePopup, sourceSchema, targetSchema, setShowListMappingModal]
     );
 
     const handleDeleteMapping = (mappingId: string, sourceFieldId: string) => {
