@@ -62,19 +62,20 @@ export function SchemaRootNode({ data }: { data: SchemaRootNodeData }) {
 
     const INDENT = 6; // pixels per depth level (reduced)
 
+
     const renderChildren = (parentId?: string, depth = 0) => {
         const children = parentMap.get(parentId) || [];
         return children.map(field => (
             <div key={field.id} style={{ display: 'block' }}>
                 <div style={{ paddingLeft: depth * INDENT, display: 'flex', alignItems: 'center', position: 'relative', paddingTop: 6, paddingBottom: 6, borderRadius: 4, background: depth % 2 === 0 ? 'rgba(0,0,0,0.02)' : 'transparent' }}>
-                    {/* Render handle for primitives and arrays to allow array→array connections. */}
+                    {/* Render handle for primitives and arrays. Position handlers vertically based on index. */}
                     {(isPrimitive(field.type) || field.isArray) && (
                         <Handle
                             type={side === 'source' ? 'source' : 'target'}
                             position={side === 'source' ? Position.Right : Position.Left}
                             id={field.path}
                             style={{
-                                background: field.isArray ? '#c06' : '#555',
+                                background: '#555',
                                 width: 10,
                                 height: 10,
                                 // center vertically within the row
@@ -85,25 +86,53 @@ export function SchemaRootNode({ data }: { data: SchemaRootNodeData }) {
                         />
                     )}
 
-                    {!isPrimitive(field.type) && (
-                        <Button variant="plain" onClick={() => toggle(field.id)} style={{ marginRight: 8 }}>
-                            {expanded[field.id] ? '-' : '+'}
-                        </Button>
-                    )}
+                    {/* Allow expand/collapse for objects and arrays of objects */}
+                    {(() => {
+                        const childrenOfArray = parentMap.get(field.id) || [];
+                        const itemNode = field.isArray ? (childrenOfArray[0] || undefined) : undefined;
+                        const canExpand = (!isPrimitive(field.type) && !field.isArray) || (field.isArray && itemNode?.type === 'object');
+                        if (!canExpand) return null;
+                        return (
+                            <Button variant="plain" onClick={() => toggle(field.id)} style={{ marginRight: 8 }}>
+                                {expanded[field.id] ? '-' : '+'}
+                            </Button>
+                        );
+                    })()}
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <div style={{ marginLeft: 6 }}>{field.name}</div>
                         {field.isArray && <Badge className="array-badge">[]</Badge>}
-                        <div style={{ color: '#666', fontSize: 11 }}>{field.type}</div>
+                        {field.isArray ? (
+                            (() => {
+                                const childrenOfArray = parentMap.get(field.id) || [];
+                                const itemNode = childrenOfArray[0];
+                                const itemType = itemNode?.type || 'unknown';
+                                // const displayType = itemType ? itemType.charAt(0).toUpperCase() + itemType.slice(1) : itemType;
+                                
+                                return <div style={{ color: '#666', fontSize: 11 }}>{itemType}</div>;
+                            })()
+                        ) : (
+                            <div style={{ color: '#666', fontSize: 11 }}>{field.type}</div>
+                        )}
                     </div>
                 </div>
 
-                {/* Render nested children below (vertical expansion) when expanded */}
-                {(!isPrimitive(field.type) && expanded[field.id]) && (
-                    <div style={{ marginTop: 4 }}>
-                        {renderChildren(field.id, depth + 1)}
-                    </div>
-                )}
+                {/* Render nested children for objects and arrays-of-objects when expanded. */}
+                {(() => {
+                    const childrenOfArray = parentMap.get(field.id) || [];
+                    const itemNode = field.isArray ? (childrenOfArray[0] || undefined) : undefined;
+                    const canRenderChildren = ((!isPrimitive(field.type) && !field.isArray) || (field.isArray && itemNode?.type === 'object')) && expanded[field.id];
+                    if (!canRenderChildren) return null;
+                    return (
+                        <div style={{ marginTop: 4 }}>
+                            {field.isArray ? (
+                                itemNode ? renderChildren(itemNode.id, depth + 1) : null
+                            ) : (
+                                renderChildren(field.id, depth + 1)
+                            )}
+                        </div>
+                    );
+                })()}
             </div>
         ));
     };

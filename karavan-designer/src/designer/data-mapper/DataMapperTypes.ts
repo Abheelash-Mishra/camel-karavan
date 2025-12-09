@@ -29,7 +29,9 @@ export interface ListMappingConfig {
     targetArrayPath: string;
     fieldMappings: FieldMapping[];
     nestedLevel: number; // Support up to 3 levels of nesting
-    description?: string; // optional label for UI
+    operation?: ArrayIterationMode; // 'for-loop' (default) or 'index-access'
+    indexSelector?: IndexSelector;
+    indexValue?: number;
 }
 
 export interface FieldDefinition {
@@ -62,6 +64,9 @@ export interface FieldMapping {
     multiSourceExpression?: string;
     typeWarning?: string;
     constantSourceIds?: string[]; // IDs of constant values used as sources
+    // Optional array index access (when mapping from arrays)
+    indexSelector?: IndexSelector;
+    indexValue?: number;
 }
 
 export interface TransformationFunction {
@@ -99,6 +104,7 @@ export interface JsltFunctionDef {
 }
 
 export const JSLT_FUNCTIONS: JsltFunctionDef[] = [
+    { name: 'index', description: 'Array index access (wraps expression with [index])', example: '(.array)[0]', params: [{ name: 'index', description: 'Index number or keywords: first, last', required: true, placeholder: '0' }] },
     { name: 'string-length', description: 'Returns length of a string', example: 'string-length(.)' },
     { name: 'split', description: 'Splits a string by a delimiter', example: 'split(., ",")', params: [{ name: 'delimiter', description: 'Delimiter string', required: true, placeholder: ',' }] },
     { name: 'join', description: 'Joins an array of strings using a delimiter', example: 'join(., ",")', params: [{ name: 'delimiter', description: 'Delimiter string', required: true, placeholder: ',' }] },

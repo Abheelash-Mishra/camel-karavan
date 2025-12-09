@@ -96,6 +96,13 @@ export function TransformationPopup({
     
     const targetField = targetFields.find(f => f.id === currentMapping?.targetFieldId);
 
+    // Detect array-specific context
+    const involvesArray = !!(targetField && (targetField.type === 'array' || targetField.isArray)) ||
+        (sourceFieldDetails.some(f => f && (f.type === 'array' || f.isArray)));
+    const isArrayToArray = !!(targetField && (targetField.type === 'array' || targetField.isArray)) &&
+        sourceFieldDetails.some(f => f && (f.type === 'array' || f.isArray));
+    const [enableForLoop, setEnableForLoop] = useState<boolean>(isArrayToArray);
+
     return (
         <Modal
             variant={ModalVariant.medium}
@@ -202,6 +209,35 @@ export function TransformationPopup({
                     </Form>
                     <Divider style={{ margin: '12px 0' }} />
                 </>
+            )}
+
+            {/* Array Mapping Configuration */}
+            {involvesArray && (
+                <Form style={{ marginBottom: '12px' }}>
+                    <Text component={TextVariants.h4} style={{ marginBottom: '8px' }}>
+                        Array Mapping
+                    </Text>
+                    <HelperText>
+                        <HelperTextItem>
+                            {isArrayToArray
+                                ? 'Map array items using a for-loop or index access.'
+                                : 'Apply array-specific operations (index access) to source or target.'}
+                        </HelperTextItem>
+                    </HelperText>
+                    <FormGroup label="Use for-loop" fieldId="array-for-loop" style={{ marginTop: 8 }}>
+                        <Button
+                            variant={enableForLoop ? 'primary' : 'secondary'}
+                            onClick={() => setEnableForLoop(!enableForLoop)}
+                        >
+                            {enableForLoop ? 'Enabled' : 'Disabled'}
+                        </Button>
+                        <HelperText>
+                            <HelperTextItem>
+                                When enabled, the generated JSLT will use [for (...)] on the source array and map item fields.
+                            </HelperTextItem>
+                        </HelperText>
+                    </FormGroup>
+                </Form>
             )}
 
             {/* Transformation Configuration */}

@@ -105,7 +105,7 @@ export function JsltEditorModal({ isOpen, jslt, onClose, onApply }: JsltEditorMo
             <div style={{ height: '500px', border: '1px solid #d2d2d2' }}>
                 <Editor
                     height="100%"
-                    defaultLanguage="javascript"
+                    defaultLanguage="json"
                     theme="light"
                     value={editedJslt}
                     onChange={(value) => setEditedJslt(value || '')}

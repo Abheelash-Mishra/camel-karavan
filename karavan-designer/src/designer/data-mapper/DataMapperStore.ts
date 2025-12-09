@@ -38,6 +38,7 @@ interface DataMapperState {
     showAddTargetFieldModal: boolean;
     showListMappingModal: boolean;
     selectedFieldForListMapping?: string;
+    selectedTargetFieldForListMapping?: string;
     listMappingConfigs: ListMappingConfig[];
 }
 
@@ -65,7 +66,7 @@ interface DataMapperActions {
     updateCustomTargetField: (id: string, updates: Partial<FieldDefinition>) => void;
     setShowAddConstantModal: (show: boolean) => void;
     setShowAddTargetFieldModal: (show: boolean) => void;
-    setShowListMappingModal: (show: boolean, fieldId?: string) => void;
+    setShowListMappingModal: (show: boolean, sourceFieldId?: string, targetFieldId?: string) => void;
     addListMappingConfig: (config: ListMappingConfig) => void;
     updateListMappingConfig: (id: string, config: ListMappingConfig) => void;
     removeListMappingConfig: (id: string) => void;
@@ -93,6 +94,7 @@ const initialState: DataMapperState = {
     showAddTargetFieldModal: false,
     showListMappingModal: false,
     selectedFieldForListMapping: undefined,
+    selectedTargetFieldForListMapping: undefined,
     listMappingConfigs: [],
 };
 
@@ -216,9 +218,10 @@ export const useDataMapperStore = create<DataMapperState & DataMapperActions>((s
     
     setShowAddTargetFieldModal: (show) => set({ showAddTargetFieldModal: show }),
     
-    setShowListMappingModal: (show, fieldId) => set({ 
+    setShowListMappingModal: (show, sourceFieldId, targetFieldId) => set({ 
         showListMappingModal: show,
-        selectedFieldForListMapping: fieldId
+        selectedFieldForListMapping: sourceFieldId,
+        selectedTargetFieldForListMapping: targetFieldId
     }),
     
     addListMappingConfig: (config) => set((state) => ({
