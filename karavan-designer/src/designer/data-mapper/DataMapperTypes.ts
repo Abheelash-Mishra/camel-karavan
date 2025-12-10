@@ -104,7 +104,6 @@ export interface JsltFunctionDef {
 }
 
 export const JSLT_FUNCTIONS: JsltFunctionDef[] = [
-    { name: 'index', description: 'Array index access (wraps expression with [index])', example: '(.array)[0]', params: [{ name: 'index', description: 'Index number or keywords: first, last', required: true, placeholder: '0' }] },
     { name: 'string-length', description: 'Returns length of a string', example: 'string-length(.)' },
     { name: 'split', description: 'Splits a string by a delimiter', example: 'split(., ",")', params: [{ name: 'delimiter', description: 'Delimiter string', required: true, placeholder: ',' }] },
     { name: 'join', description: 'Joins an array of strings using a delimiter', example: 'join(., ",")', params: [{ name: 'delimiter', description: 'Delimiter string', required: true, placeholder: ',' }] },

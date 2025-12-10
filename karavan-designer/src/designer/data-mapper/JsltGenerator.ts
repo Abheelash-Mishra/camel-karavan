@@ -338,9 +338,51 @@ export class JsltGenerator {
             expr = this.normalizeItemExpression(expr);
         }
 
+        // If mapping requests an explicit index selector (array -> non-array mapping), insert index access
+        if (mapping.indexSelector) {
+            const iteratorArrayPath = this.getNearestArrayAncestorPath(sourceField.path, sourceFields);
+            // determine index expression
+            let indexExpr = '0';
+            if (mapping.indexSelector === 'first' || !mapping.indexSelector) {
+                indexExpr = '0';
+            } else if (mapping.indexSelector === 'last') {
+                // use size(array) - 1
+                if (iteratorArrayPath) {
+                    const itJslt = this.getJsltPath(iteratorArrayPath);
+                    indexExpr = `size(${itJslt}) - 1`;
+                } else {
+                    indexExpr = '0';
+                }
+            } else if (mapping.indexSelector === 'custom' && typeof mapping.indexValue === 'number') {
+                indexExpr = String(mapping.indexValue);
+            } else {
+                indexExpr = String(mapping.indexSelector);
+            }
+
+            if (iteratorArrayPath) {
+                const itJslt = this.getJsltPath(iteratorArrayPath);
+                // If expr begins with the iterator, insert [index] after it
+                if (expr.startsWith(itJslt)) {
+                    expr = `${itJslt}[${indexExpr}]${expr.slice(itJslt.length)}`;
+                } else {
+                    // Try replacing first occurrence
+                    const replaced = expr.replace(itJslt, `${itJslt}[${indexExpr}]`);
+                    if (replaced === expr) {
+                        // Fallback: append index to whole expr
+                        expr = `${expr}[${indexExpr}]`;
+                    } else {
+                        expr = replaced;
+                    }
+                }
+            } else {
+                // No iterator found; fallback to appending index selector
+                expr = `${expr}[${indexExpr}]`;
+            }
+        }
+
         // If a join() transformation is requested and the source is under an array,
         // wrap the expression in a for-loop to build an array for join.
-        if (mapping.transformation && mapping.transformation.name === 'join' && !baseIterator) {
+        if (mapping.transformation && mapping.transformation.name === 'join' && !baseIterator && mapping.indexSelector === undefined) {
             const iteratorArrayPath = this.getNearestArrayAncestorPath(sourceField.path, sourceFields);
             if (iteratorArrayPath) {
                 const iteratorJslt = this.getJsltPath(iteratorArrayPath);

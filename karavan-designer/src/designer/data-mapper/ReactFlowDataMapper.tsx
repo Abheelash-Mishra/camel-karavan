@@ -383,7 +383,21 @@ export function ReactFlowDataMapper() {
             // If either side is an array, open Transformation Popup with array-specific operations
             const sField = sourceSchema?.fields.find(f => f.id === sourceFieldId);
             const tField = targetSchema?.fields.find(f => f.id === targetFieldId);
-            const involvesArray = (sField?.type === 'array' || sField?.isArray || tField?.type === 'array' || tField?.isArray);
+            // Helper: find nearest array ancestor for a given source field
+            const findNearestArrayAncestor = (fieldId?: string) => {
+                if (!fieldId || !sourceSchema) return undefined;
+                let node = sourceSchema.fields.find(f => f.id === fieldId);
+                while (node && node.parent) {
+                    const parent = sourceSchema.fields.find(f => f.id === node!.parent);
+                    if (!parent) break;
+                    if (parent.type === 'array' || parent.isArray) return parent;
+                    node = parent;
+                }
+                return undefined;
+            };
+
+            const nearestArrayAncestor = findNearestArrayAncestor(sField?.id);
+            const involvesArray = (sField?.type === 'array' || sField?.isArray || nearestArrayAncestor || tField?.type === 'array' || tField?.isArray);
 
             // Check if target already has mappings
             const existingMappings = mappings.filter(m => m.targetFieldId === targetFieldId);
@@ -399,13 +413,19 @@ export function ReactFlowDataMapper() {
                 }
             } else {
                 // New mapping
+                // Default mapping; if mapping is from an array (source) to a non-array (target)
+                // default to selecting the first index so transformations behave deterministically.
                 const newMapping: FieldMapping = {
                     id: uuidv4(),
                     sourceFieldIds: [sourceFieldId],
                     targetFieldId,
                 };
+                // If mapping a child-of-array (or array) to a non-array target, default to first index
+                if ((sField && (sField.type === 'array' || sField.isArray) || nearestArrayAncestor) && tField && !(tField.type === 'array' || tField.isArray)) {
+                    newMapping.indexSelector = 'first';
+                }
                 addMapping(newMapping);
-                // If mapping involves arrays on either side, open transformation popup for configuration
+                // If mapping involves arrays on either side (including child-of-array), open transformation popup for configuration
                 if (involvesArray) {
                     setShowTransformationPopup(true, newMapping.id);
                 }
@@ -493,9 +513,10 @@ export function ReactFlowDataMapper() {
         handleApplyJslt(jsltContent);
     };
 
-    const handleApplyTransformation = (transformation: TransformationFunction | undefined) => {
+    // Accepts partial FieldMapping updates (transformation, indexSelector, indexValue, etc.)
+    const handleApplyTransformation = (updates: Partial<FieldMapping>) => {
         if (selectedMappingForTransform) {
-            updateMapping(selectedMappingForTransform, { transformation });
+            updateMapping(selectedMappingForTransform, updates);
         }
     };
 
