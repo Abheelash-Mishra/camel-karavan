@@ -403,11 +403,27 @@ export function ReactFlowDataMapper() {
             const existingMappings = mappings.filter(m => m.targetFieldId === targetFieldId);
 
             if (existingMappings.length > 0) {
-                // Multi-source mapping - show popup
+                // Multi-source mapping - show popup and ensure expression acknowledges all sources
                 const existingMapping = existingMappings[0];
                 if (!existingMapping.sourceFieldIds.includes(sourceFieldId)) {
+                    const nextSourceIds = [...existingMapping.sourceFieldIds, sourceFieldId];
+                    // If there's an existing expression, auto-extend it to include the new placeholder
+                    let nextExpression = existingMapping.multiSourceExpression;
+                    if (nextExpression && typeof nextExpression === 'string') {
+                        const currentCount = existingMapping.sourceFieldIds.length;
+                        const newPlaceholder = `source${currentCount + 1}`;
+                        // Only extend if the expression doesn't already contain the new placeholder
+                        if (!new RegExp(`\\b${newPlaceholder}\\b`).test(nextExpression)) {
+                            nextExpression = `${nextExpression} + " " + ${newPlaceholder}`;
+                        }
+                    } else {
+                        // No expression yet; create a template including all placeholders
+                        nextExpression = nextSourceIds.map((_, idx) => `source${idx + 1}`).join(' + " " + ');
+                    }
+
                     updateMapping(existingMapping.id, {
-                        sourceFieldIds: [...existingMapping.sourceFieldIds, sourceFieldId],
+                        sourceFieldIds: nextSourceIds,
+                        multiSourceExpression: nextExpression,
                     });
                     setShowMultiSourcePopup(true, targetFieldId);
                 }

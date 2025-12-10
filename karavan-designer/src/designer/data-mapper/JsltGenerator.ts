@@ -316,9 +316,13 @@ export class JsltGenerator {
      * Build mapping expression for a single field
      */
     private static buildMappingExpression(mapping: FieldMapping, sourceFields: FieldDefinition[], baseIterator?: string): string {
+        // If we have a multi-source expression, build it first and then allow transformation application below
         if (mapping.multiSourceExpression) {
-            // Multi-source concatenation
-            return this.buildMultiSourceExpression(mapping, sourceFields, baseIterator);
+            let expr = this.buildMultiSourceExpression(mapping, sourceFields, baseIterator);
+            if (mapping.transformation) {
+                expr = this.applyTransformation(expr, mapping.transformation);
+            }
+            return expr;
         }
 
         const sourceField = sourceFields.find(f => f.id === mapping.sourceFieldIds[0]);
