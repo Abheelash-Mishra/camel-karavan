@@ -68,23 +68,51 @@ export function SchemaRootNode({ data }: { data: SchemaRootNodeData }) {
         return children.map(field => (
             <div key={field.id} style={{ display: 'block' }}>
                 <div style={{ paddingLeft: depth * INDENT, display: 'flex', alignItems: 'center', position: 'relative', paddingTop: 6, paddingBottom: 6, borderRadius: 4, background: depth % 2 === 0 ? 'rgba(0,0,0,0.02)' : 'transparent' }}>
-                    {/* Render handle for primitives and arrays. Position handlers vertically based on index. */}
-                    {(isPrimitive(field.type) || field.isArray) && (
-                        <Handle
-                            type={side === 'source' ? 'source' : 'target'}
-                            position={side === 'source' ? Position.Right : Position.Left}
-                            id={field.path}
-                            style={{
-                                background: '#555',
-                                width: 10,
-                                height: 10,
-                                // center vertically within the row
-                                top: '50%',
-                                transform: 'translateY(-50%)',
-                                marginRight: 8,
-                            }}
-                        />
-                    )}
+                    {/* Render handle for primitives and for arrays of primitives only. */}
+                    {(() => {
+                        if (isPrimitive(field.type)) {
+                            return (
+                                <Handle
+                                    type={side === 'source' ? 'source' : 'target'}
+                                    position={side === 'source' ? Position.Right : Position.Left}
+                                    id={field.path}
+                                    style={{
+                                        background: '#555',
+                                        width: 10,
+                                        height: 10,
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        marginRight: 8,
+                                    }}
+                                />
+                            );
+                        }
+
+                        if (field.isArray) {
+                            const arrayChildren = parentMap.get(field.id) || [];
+                            const itemNode = arrayChildren[0];
+                            // Only show a handle for arrays when the item node is a primitive (array of primitives)
+                            if (!itemNode || isPrimitive(itemNode.type)) {
+                                return (
+                                    <Handle
+                                        type={side === 'source' ? 'source' : 'target'}
+                                        position={side === 'source' ? Position.Right : Position.Left}
+                                        id={field.path}
+                                        style={{
+                                            background: '#555',
+                                            width: 10,
+                                            height: 10,
+                                            top: '50%',
+                                            transform: 'translateY(-50%)',
+                                            marginRight: 8,
+                                        }}
+                                    />
+                                );
+                            }
+                        }
+
+                        return null;
+                    })()}
 
                     {/* Allow expand/collapse for objects and arrays of objects */}
                     {(() => {

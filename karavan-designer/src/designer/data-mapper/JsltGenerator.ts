@@ -338,8 +338,17 @@ export class JsltGenerator {
             expr = this.normalizeItemExpression(expr);
         }
 
-        // Arrays now use direct path access without index selectors in simplified UI
-        // The path already includes proper array notation from SchemaParser
+        // If a join() transformation is requested and the source is under an array,
+        // wrap the expression in a for-loop to build an array for join.
+        if (mapping.transformation && mapping.transformation.name === 'join' && !baseIterator) {
+            const iteratorArrayPath = this.getNearestArrayAncestorPath(sourceField.path, sourceFields);
+            if (iteratorArrayPath) {
+                const iteratorJslt = this.getJsltPath(iteratorArrayPath);
+                const rel = this.relativize(expr, iteratorJslt);
+                const relNorm = this.normalizeItemExpression(rel);
+                expr = `[for (${iteratorJslt}) ${relNorm}]`;
+            }
+        }
 
         // Apply transformation if specified
         if (mapping.transformation) {
@@ -491,10 +500,14 @@ export class JsltGenerator {
 
         // Support both dot-based paths and JSON Pointer style paths starting with '/'
         if (fieldPath.startsWith('/')) {
-            const parts = fieldPath.split('/').filter(p => p !== '');
+            // Drop wildcard '*' segments; JSLT uses '.' for current item inside loops
+            const parts = fieldPath.split('/').filter(p => p !== '' && p !== '*');
             if (parts.length === 0) return '.';
-            // Keep '*' wildcard for array items
-            const jslt = parts.map(p => p === '*' ? '*' : p).map(p => `.${p}`).join('');
+            let jslt = parts.map(p => `.${p}`).join('');
+            // Collapse accidental duplicate '.items.items'
+            jslt = jslt.replace(/\.items\.items/g, '.items');
+            // Collapse any duplicate dots
+            jslt = jslt.replace(/\.\.+/g, '.');
             return jslt || '.';
         }
 
