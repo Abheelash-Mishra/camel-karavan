@@ -81,8 +81,8 @@ export function SchemaRootNode({ data }: { data: SchemaRootNodeData }) {
                                         width: 10,
                                         height: 10,
                                         top: '50%',
-                                        transform: 'translateY(-50%)',
-                                        marginRight: 8,
+                                        transform: `translateX(${side === 'source' ? '3px' : '0px'}) translateY(-50%)`,
+                                        marginRight: 0,
                                     }}
                                 />
                             );

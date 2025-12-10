@@ -80,7 +80,7 @@ export function SchemaRootNode({ data }: { data: SchemaRootNodeData }) {
                                 // center vertically within the row
                                 top: '50%',
                                 transform: 'translateY(-50%)',
-                                marginRight: 8,
+                                marginRight: 0,
                             }}
                         />
                     )}

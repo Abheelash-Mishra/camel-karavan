@@ -104,6 +104,7 @@ export function ReactFlowDataMapper() {
         showTransformationPopup,
         showMultiSourcePopup,
         selectedMappingForTransform,
+        selectedSourceForTransform,
         selectedTargetForMultiSource,
         constants,
         customTargetFields,
@@ -148,6 +149,7 @@ export function ReactFlowDataMapper() {
             s.showTransformationPopup,
             s.showMultiSourcePopup,
             s.selectedMappingForTransform,
+            s.selectedSourceForTransform,
             s.selectedTargetForMultiSource,
             s.constants,
             s.customTargetFields,
@@ -185,6 +187,7 @@ export function ReactFlowDataMapper() {
 
     const [nodes, setNodes, onNodesChange] = useNodesState([] as any);
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+    const [edgeBends, setEdgeBends] = useState<Record<string, { dx: number; dy: number }>>({});
     const [showClearMappingsConfirm, setShowClearMappingsConfirm] = useState(false);
     const [showResetAllConfirm, setShowResetAllConfirm] = useState(false);
 
@@ -284,7 +287,6 @@ export function ReactFlowDataMapper() {
             const edgesForThisTarget = targetToMappings.get(targetFieldId) || [];
             
             mapping.sourceFieldIds.forEach((sourceFieldId, index) => {
-                const edgeId = `${sourceFieldId}-${targetFieldId}-${index}`;
                 
                 // Check for type compatibility warning
                 const sourceField = sourceSchema?.fields.find(f => f.id === sourceFieldId);
@@ -294,8 +296,8 @@ export function ReactFlowDataMapper() {
                     ? `Type mismatch: ${sourceField?.type} → ${targetField?.type}`
                     : undefined;
 
-                // Only show transformation button on the first edge of multi-source mappings
-                const showTransformation = !isMultiSource || index === 0;
+                // All edges should open the transformation popup on click
+                const showTransformation = true;
 
                 // Calculate curve offset to prevent overlapping
                 const totalEdges = edgesForThisTarget.length;
@@ -317,6 +319,8 @@ export function ReactFlowDataMapper() {
                 const edgeTarget = 'target-root';
                 const edgeTargetHandle = targetField?.path;
 
+                const edgeId = `${sourceFieldId}-${targetFieldId}-${index}`;
+                const edgeBend = edgeBends[edgeId] || { dx: 0, dy: 0 };
                 newEdges.push({
                     id: edgeId,
                     source: edgeSource,
@@ -335,10 +339,15 @@ export function ReactFlowDataMapper() {
                         hasTransformation: showTransformation && !!mapping.transformation,
                         transformationName: mapping.transformation?.name,
                         onDelete: () => handleDeleteMapping(mapping.id, sourceFieldId),
-                        onEditTransformation: showTransformation ? () => handleEditTransformation(mapping.id) : undefined,
+                        onEditTransformation: () => handleEditTransformation(mapping.id, sourceFieldId),
                         showTransformButton: showTransformation,
                         mappingId: mapping.id,
                         curveOffset: offset,
+                        controlDX: edgeBend.dx,
+                        controlDY: edgeBend.dy,
+                        onBendChange: (eId: string, dx: number, dy: number) => {
+                            setEdgeBends(prev => ({ ...prev, [eId]: { dx, dy } }));
+                        },
                     },
                 });
             });
@@ -347,7 +356,7 @@ export function ReactFlowDataMapper() {
         // No operator edges; list mappings are configured via modal and materialize as item-level edges
 
         setEdges(newEdges);
-    }, [mappings, listMappingConfigs, sourceSchema, targetSchema]);
+    }, [mappings, listMappingConfigs, sourceSchema, targetSchema, edgeBends]);
 
     const handleListMappingOpen = (sourceFieldId: string, targetFieldId: string) => {
         setShowListMappingModal(true, sourceFieldId, targetFieldId);
@@ -465,8 +474,8 @@ export function ReactFlowDataMapper() {
         }
     };
 
-    const handleEditTransformation = (mappingId: string) => {
-        setShowTransformationPopup(true, mappingId);
+    const handleEditTransformation = (mappingId: string, sourceFieldId?: string) => {
+        setShowTransformationPopup(true, mappingId, sourceFieldId);
     };
 
     const handleUploadSource = (content: any, schemaType: SchemaType, fileName: string) => {
@@ -714,6 +723,55 @@ export function ReactFlowDataMapper() {
                 onEditMultiSource={() => {
                     if (currentMappingForTransform) {
                         setShowMultiSourcePopup(true, currentMappingForTransform.targetFieldId);
+                    }
+                }}
+                onDeleteMapping={() => {
+                    if (selectedMappingForTransform) {
+                        const mapping = mappings.find(m => m.id === selectedMappingForTransform);
+                        if (!mapping) return;
+                        if (mapping.sourceFieldIds.length > 1 && selectedSourceForTransform) {
+                            const oldIds = mapping.sourceFieldIds;
+                            const removedIndex = oldIds.findIndex(id => id === selectedSourceForTransform);
+                            const newIds = oldIds.filter(id => id !== selectedSourceForTransform);
+
+                            // Adjust multi-source expression placeholders to reflect removal
+                            let nextExpr = mapping.multiSourceExpression;
+                            if (nextExpr && removedIndex !== -1) {
+                                // Renumber placeholders source{n} -> source{n-1} for n > removedIndex+1
+                                for (let n = oldIds.length; n >= removedIndex + 2; n--) {
+                                    const from = new RegExp(`\\bsource${n}\\b`, 'g');
+                                    nextExpr = nextExpr.replace(from, `source${n - 1}`);
+                                }
+                                // Remove the placeholder for the removed source
+                                const removedPh = new RegExp(`\\bsource${removedIndex + 1}\\b`, 'g');
+                                nextExpr = nextExpr.replace(removedPh, '');
+                                // Basic cleanup of stray operators and empty/whitespace-only strings
+                                // 1) Collapse duplicate pluses (after removals)
+                                nextExpr = nextExpr.replace(/\+\s*\+/g, '+');
+                                // 2) Remove + "" or + ' ' (whitespace-only literal) at the end
+                                nextExpr = nextExpr.replace(/\+\s*(["'])\s*\1\s*$/g, '');
+                                // 3) Remove leading "" + or ' ' + (whitespace-only literal at start)
+                                nextExpr = nextExpr.replace(/^\s*(["'])\s*\1\s*\+\s*/g, '');
+                                // 4) Replace + "" + or + ' ' + between operands with a single +
+                                nextExpr = nextExpr.replace(/\s*\+\s*(["'])\s*\1\s*\+\s*/g, ' + ');
+                                // 5) Remove dangling leading/trailing plus
+                                nextExpr = nextExpr.replace(/^\s*\+\s*/, '').replace(/\s*\+\s*$/, '');
+                                // 6) Trim outer whitespace
+                                nextExpr = nextExpr.trim();
+                                // If only one source remains and expression reduces to empty, clear it
+                                if (newIds.length <= 1 && (!nextExpr || nextExpr.trim() === '')) {
+                                    nextExpr = undefined;
+                                }
+                            }
+
+                            updateMapping(selectedMappingForTransform, {
+                                sourceFieldIds: newIds,
+                                multiSourceExpression: nextExpr,
+                            });
+                        } else {
+                            removeMapping(selectedMappingForTransform);
+                        }
+                        setShowTransformationPopup(false);
                     }
                 }}
             />

@@ -31,6 +31,7 @@ interface DataMapperState {
     showTransformationPopup: boolean;
     showMultiSourcePopup: boolean;
     selectedMappingForTransform?: string;
+    selectedSourceForTransform?: string;
     selectedTargetForMultiSource?: string;
     constants: ConstantValue[];
     customTargetFields: FieldDefinition[];
@@ -56,7 +57,7 @@ interface DataMapperActions {
     setSelectedMapping: (id?: string) => void;
     setShowUploadModal: (show: boolean, type?: 'source' | 'target' | 'jslt') => void;
     setShowJsltEditorModal: (show: boolean) => void;
-    setShowTransformationPopup: (show: boolean, mappingId?: string) => void;
+    setShowTransformationPopup: (show: boolean, mappingId?: string, sourceFieldId?: string) => void;
     setShowMultiSourcePopup: (show: boolean, targetFieldId?: string) => void;
     addConstant: (constant: ConstantValue) => void;
     removeConstant: (id: string) => void;
@@ -87,6 +88,7 @@ const initialState: DataMapperState = {
     showTransformationPopup: false,
     showMultiSourcePopup: false,
     selectedMappingForTransform: undefined,
+    selectedSourceForTransform: undefined,
     selectedTargetForMultiSource: undefined,
     constants: [],
     customTargetFields: [],
@@ -180,9 +182,10 @@ export const useDataMapperStore = create<DataMapperState & DataMapperActions>((s
     
     setShowJsltEditorModal: (show) => set({ showJsltEditorModal: show }),
     
-    setShowTransformationPopup: (show, mappingId) => set({ 
+    setShowTransformationPopup: (show, mappingId, sourceFieldId) => set({ 
         showTransformationPopup: show,
-        selectedMappingForTransform: mappingId
+        selectedMappingForTransform: mappingId,
+        selectedSourceForTransform: sourceFieldId
     }),
     
     setShowMultiSourcePopup: (show, targetFieldId) => set({ 

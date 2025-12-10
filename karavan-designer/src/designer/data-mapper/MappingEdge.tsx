@@ -16,9 +16,7 @@
  */
 
 import React from 'react';
-import { EdgeProps, getBezierPath, EdgeLabelRenderer, BaseEdge } from 'reactflow';
-import { Button, Tooltip } from '@patternfly/react-core';
-import { TimesIcon, EditIcon } from '@patternfly/react-icons';
+import { EdgeProps } from 'reactflow';
 
 export interface MappingEdgeData {
     hasWarning?: boolean;
@@ -31,6 +29,9 @@ export interface MappingEdgeData {
     showTransformButton?: boolean;
     mappingId?: string;
     curveOffset?: number;
+    controlDX?: number;
+    controlDY?: number;
+    onBendChange?: (edgeId: string, dx: number, dy: number) => void;
 }
 
 export function MappingEdge({
@@ -39,31 +40,31 @@ export function MappingEdge({
     sourceY,
     targetX,
     targetY,
-    sourcePosition,
-    targetPosition,
     data,
     markerEnd,
-    source,
 }: EdgeProps<MappingEdgeData>) {
     const curveOffset = data?.curveOffset || 0;
-    
-    // Calculate control points with offset to prevent overlapping
-    const [edgePath, labelX, labelY] = getBezierPath({
-        sourceX,
-        sourceY,
-        sourcePosition,
-        targetX,
-        targetY,
-        targetPosition,
-        curvature: 0.25 + Math.abs(curveOffset) * 0.01,
-    });
+    const controlDX = data?.controlDX || 0;
+    const controlDY = data?.controlDY || 0;
+
+    // Compute cubic bezier path using control points closer to the straight line
+    const dx = targetX - sourceX;
+    const dy = targetY - sourceY;
+    const c1x = sourceX + dx * 0.35 + controlDX;
+    const c1y = sourceY + dy * 0.35 + controlDY;
+    const c2x = sourceX + dx * 0.65 + controlDX;
+    const c2y = sourceY + dy * 0.65 + controlDY;
+    const edgePath = `M ${sourceX},${sourceY} C ${c1x},${c1y} ${c2x},${c2y} ${targetX},${targetY}`;
+
+    // Compute label position at t=0.5 on the bezier curve
+    const t = 0.5;
+    const x = (1 - t) ** 3 * sourceX + 3 * (1 - t) ** 2 * t * c1x + 3 * (1 - t) * t ** 2 * c2x + t ** 3 * targetX;
+    const y = (1 - t) ** 3 * sourceY + 3 * (1 - t) ** 2 * t * c1y + 3 * (1 - t) * t ** 2 * c2y + t ** 3 * targetY;
+    const labelX = x;
+    const labelY = y;
 
     const hasWarning = data?.hasWarning || false;
-    const hasTransformation = data?.hasTransformation || false;
-    const showTransformButton = data?.showTransformButton === true;
     const mappingId = data?.mappingId || id;
-    const sourceFieldIdFromNode = source?.replace('source-', '') || '';
-    const sourceFieldId = (data && (data as any).sourceFieldId) || (source && source.startsWith('const-') ? source.replace('const-', '') : sourceFieldIdFromNode) || '';
 
     const edgeStyle = {
         stroke: hasWarning ? '#f0ab00' : '#06c',
@@ -71,68 +72,46 @@ export function MappingEdge({
         strokeDasharray: hasWarning ? '5,5' : undefined,
     };
 
+    // Drag handling for the edge path itself (no visible handle)
+    const onMouseDownPath = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const startDX = controlDX;
+        const startDY = controlDY;
+        let moved = false;
+
+        const onMove = (ev: MouseEvent) => {
+            const ndx = startDX + (ev.clientX - startX);
+            const ndy = startDY + (ev.clientY - startY);
+            data?.onBendChange?.(id, ndx, ndy);
+            moved = true;
+        };
+        const onUp = () => {
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+            if (!moved) {
+                // Treat as click to open transformation popup
+                data?.onEditTransformation?.(mappingId!);
+            }
+        };
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+    };
+
     return (
-        <>
-            <BaseEdge 
-                id={id} 
-                path={edgePath} 
-                markerEnd={markerEnd}
-                style={edgeStyle}
+        <g>
+            {/* Visible stroke */}
+            <path d={edgePath} markerEnd={markerEnd as any} style={edgeStyle as any} fill="none" />
+            {/* Invisible wide stroke for interaction (click/drag) */}
+            <path
+                d={edgePath}
+                stroke="transparent"
+                strokeWidth={16}
+                fill="none"
+                style={{ cursor: 'pointer' }}
+                onMouseDown={onMouseDownPath}
             />
-            <EdgeLabelRenderer>
-                <div
-                    style={{
-                        position: 'absolute',
-                        transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-                        pointerEvents: 'all',
-                    }}
-                    className="edge-label-container"
-                >
-                    <div className="edge-actions">
-                        {showTransformButton && hasTransformation && data?.transformationName && (
-                            <Tooltip content={`Transformation: ${data.transformationName}`}>
-                                <Button
-                                    variant="plain"
-                                    size="sm"
-                                    className="edge-transform-badge"
-                                    onClick={() => data?.onEditTransformation?.(mappingId)}
-                                >
-                                    <EditIcon /> {data.transformationName}
-                                </Button>
-                            </Tooltip>
-                        )}
-                        
-                        {showTransformButton && !hasTransformation && (
-                            <Tooltip content="Add transformation">
-                                <Button
-                                    variant="plain"
-                                    size="sm"
-                                    onClick={() => data?.onEditTransformation?.(mappingId)}
-                                >
-                                    <EditIcon />
-                                </Button>
-                            </Tooltip>
-                        )}
-
-                        <Tooltip content={hasWarning ? data?.warningMessage : "Delete mapping"}>
-                            <Button
-                                variant="plain"
-                                size="sm"
-                                onClick={() => data?.onDelete?.(mappingId, sourceFieldId)}
-                                className={hasWarning ? 'edge-warning' : ''}
-                            >
-                                <TimesIcon />
-                            </Button>
-                        </Tooltip>
-                    </div>
-
-                    {hasWarning && data?.warningMessage && (
-                        <div className="edge-warning-message">
-                            ⚠ {data.warningMessage}
-                        </div>
-                    )}
-                </div>
-            </EdgeLabelRenderer>
-        </>
+        </g>
     );
 }

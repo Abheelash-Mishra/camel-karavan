@@ -104,7 +104,8 @@ export interface JsltFunctionDef {
 }
 
 export const JSLT_FUNCTIONS: JsltFunctionDef[] = [
-    { name: 'string-length', description: 'Returns length of a string', example: 'string-length(.)' },
+    { name: 'size', description: 'Returns length of the input', example: 'size(.)' },
+
     { name: 'split', description: 'Splits a string by a delimiter', example: 'split(., ",")', params: [{ name: 'delimiter', description: 'Delimiter string', required: true, placeholder: ',' }] },
     { name: 'join', description: 'Joins an array of strings using a delimiter', example: 'join(., ",")', params: [{ name: 'delimiter', description: 'Delimiter string', required: true, placeholder: ',' }] },
     { name: 'substring', description: 'Extracts a substring from a string', example: 'substring(., 0, 5)', params: [{ name: 'start', description: 'Start index', required: true, placeholder: '0' }, { name: 'end', description: 'End index', required: false, placeholder: '5' }] },
