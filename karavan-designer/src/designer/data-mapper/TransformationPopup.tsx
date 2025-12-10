@@ -64,18 +64,15 @@ export function TransformationPopup({
     const [parameters, setParameters] = useState<string[]>(
         currentMapping?.transformation?.parameters || []
     );
-
-    // Index selection state for array->non-array mappings
-    const [indexSelector, setIndexSelector] = useState<IndexSelector | undefined>(currentMapping?.indexSelector);
-    const [indexValue, setIndexValue] = useState<number | undefined>(currentMapping?.indexValue);
-    const [indexEnabled, setIndexEnabled] = useState<boolean>(currentMapping?.indexSelector !== undefined);
+    // Local index selection state for contexts where indexing makes sense
+    const [localIndexSelector, setLocalIndexSelector] = useState<IndexSelector | undefined>(currentMapping?.indexSelector);
+    const [localIndexValue, setLocalIndexValue] = useState<number | undefined>(currentMapping?.indexValue);
 
     React.useEffect(() => {
         setSelectedFunction(currentMapping?.transformation?.name || '');
         setParameters(currentMapping?.transformation?.parameters || []);
-        setIndexSelector(currentMapping?.indexSelector);
-        setIndexValue(currentMapping?.indexValue);
-        setIndexEnabled(currentMapping?.indexSelector !== undefined);
+        setLocalIndexSelector(currentMapping?.indexSelector);
+        setLocalIndexValue(currentMapping?.indexValue);
     }, [currentMapping, isOpen]);
 
     const handleApply = () => {
@@ -88,15 +85,53 @@ export function TransformationPopup({
                 parameters: parameters && parameters.length > 0 ? parameters.map(p => p?.toString()) : undefined,
             };
         }
-        // Include index selection if set (may be undefined)
-        if (indexSelector) {
-            updates.indexSelector = indexSelector;
-            if (indexSelector === 'custom' && typeof indexValue === 'number') {
-                updates.indexValue = indexValue;
-            } else {
+
+        // Infer array behavior (indexing vs for-loop) from context and selected transformation
+        // - If mapping is child-of-array -> non-array AND an array function is selected: clear index to allow for-loop array comprehension inside function
+        // - If mapping is child-of-array -> non-array AND no array function selected: default to first index (0)
+        // - Otherwise: clear any index selection
+        const arrayFunctionNames = new Set(['sum','min','max','size','flatten','reverse','sort','unique','join']);
+        const isArrayFunctionSelected = selectedFunction ? arrayFunctionNames.has(selectedFunction) : false;
+
+        // Determine context
+        const sourceFieldDetails = currentMapping?.sourceFieldIds.map(id => 
+            sourceFields.find(f => f.id === id)
+        ).filter(Boolean) || [];
+        const targetField = targetFields.find(f => f.id === currentMapping?.targetFieldId);
+
+        const findNearestArrayAncestor = (field: FieldDefinition | undefined) => {
+            if (!field || !sourceFields) return undefined;
+            let node: FieldDefinition | undefined = field;
+            while (node && node.parent) {
+                const parent = sourceFields.find(f => f.id === node!.parent);
+                if (!parent) break;
+                if (parent.type === 'array' || parent.isArray) return parent;
+                node = parent;
+            }
+            return undefined;
+        };
+
+        const sourceUnderArray = !!(
+            sourceFieldDetails.length === 1 && (
+                (sourceFieldDetails[0] && (sourceFieldDetails[0].type === 'array' || sourceFieldDetails[0].isArray)) ||
+                !!findNearestArrayAncestor(sourceFieldDetails[0])
+            )
+        );
+        const targetIsArray = !!(targetField && (targetField.type === 'array' || targetField.isArray));
+        const childOfArrayToNonArray = sourceUnderArray && !targetIsArray;
+
+        if (childOfArrayToNonArray) {
+            if (isArrayFunctionSelected) {
+                // Clear any index selection to let generator build [for (...)] within the function
+                updates.indexSelector = undefined;
                 updates.indexValue = undefined;
+            } else {
+                // Use chosen index from UI, default to first
+                updates.indexSelector = (localIndexSelector || 'first') as IndexSelector;
+                updates.indexValue = localIndexSelector === 'custom' && typeof localIndexValue === 'number' ? localIndexValue : undefined;
             }
         } else {
+            // No indexing applicable in other contexts
             updates.indexSelector = undefined;
             updates.indexValue = undefined;
         }
@@ -104,22 +139,6 @@ export function TransformationPopup({
         onApply(updates);
         onClose();
     };
-
-    // Persist index changes immediately so generator and UI reflect index updates without needing Apply
-    React.useEffect(() => {
-        if (!isOpen || !currentMapping) return;
-        // Only send index-related updates (do not override transformation here)
-        const updates: Partial<FieldMapping> = {};
-        if (indexEnabled) {
-            updates.indexSelector = indexSelector;
-            updates.indexValue = indexSelector === 'custom' ? indexValue : undefined;
-        } else {
-            updates.indexSelector = undefined;
-            updates.indexValue = undefined;
-        }
-        onApply(updates);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [indexEnabled, indexSelector, indexValue]);
 
     const handleRemove = () => {
         // Clearing transformation and index selection
@@ -157,17 +176,14 @@ export function TransformationPopup({
     });
     const targetIsArray = !!(targetField && (targetField.type === 'array' || targetField.isArray));
     const involvesArray = targetIsArray || sourceHasArrayContext;
-    const isArrayToArray = targetIsArray && sourceHasArrayContext;
-    const [enableForLoop, setEnableForLoop] = useState<boolean>(isArrayToArray);
-
-    // Show index selector when the single source field is under an array (either itself or an ancestor),
-    // and the target is not an array (we pick an item).
-    const showIndexSelector = !!(
-        sourceFieldDetails.length === 1 &&
-        ( (sourceFieldDetails[0] && (sourceFieldDetails[0].type === 'array' || sourceFieldDetails[0].isArray)) ||
-          !!findNearestArrayAncestor(sourceFieldDetails[0]) ) &&
-        !(targetField && (targetField.type === 'array' || targetField.isArray))
+    const childOfArrayToNonArray = !!(
+        sourceFieldDetails.length === 1 && (
+            (sourceFieldDetails[0] && (sourceFieldDetails[0].type === 'array' || sourceFieldDetails[0].isArray)) ||
+            !!findNearestArrayAncestor(sourceFieldDetails[0])
+        ) && !targetIsArray
     );
+    const arrayFunctionNames = new Set(['sum','min','max','size','flatten','reverse','sort','unique','join']);
+    const isArrayFunctionSelected = selectedFunction ? arrayFunctionNames.has(selectedFunction) : false;
 
     return (
         <Modal
@@ -277,116 +293,47 @@ export function TransformationPopup({
                 </>
             )}
 
-            {/* Array Mapping Configuration */}
-            {involvesArray && (
+            {/* Index selection is shown only when indexing makes sense and no array function is chosen */}
+            {childOfArrayToNonArray && !isArrayFunctionSelected && (
                 <Form style={{ marginBottom: '12px' }}>
                     <Text component={TextVariants.h4} style={{ marginBottom: '8px' }}>
-                        Array Mapping
+                        Index Selection
                     </Text>
                     <HelperText>
                         <HelperTextItem>
-                            {isArrayToArray
-                                ? 'Map array items using a for-loop or index access.'
-                                : 'Apply array-specific operations (index access) to source or target.'}
+                            Pick a single item from the source array to map.
                         </HelperTextItem>
                     </HelperText>
-                    <FormGroup label="Use for-loop" fieldId="array-for-loop" style={{ marginTop: 8 }}>
-                        <Button
-                            variant={enableForLoop ? 'primary' : 'secondary'}
-                            isDisabled={indexEnabled}
-                            onClick={() => {
-                                const next = !enableForLoop;
-                                setEnableForLoop(next);
-                                if (next) {
-                                    // Enabling for-loop disables indexing
-                                    if (indexEnabled) {
-                                        setIndexEnabled(false);
-                                    }
-                                    setIndexSelector(undefined);
-                                    setIndexValue(undefined);
-                                    // Persist removal of index selection immediately
-                                    onApply({ indexSelector: undefined, indexValue: undefined });
-                                }
-                            }}
-                        >
-                            {enableForLoop ? 'Enabled' : 'Disabled'}
-                        </Button>
-                        <HelperText>
-                            <HelperTextItem>
-                                When enabled, the generated JSLT will use [for (...)] on the source array and map item fields.
-                            </HelperTextItem>
-                            <HelperTextItem variant="warning">
-                                Indexing and for-loop are mutually exclusive. Disable indexing to use for-loop.
-                            </HelperTextItem>
-                        </HelperText>
-                    </FormGroup>
-
-                    {showIndexSelector && (
-                        <div style={{ marginTop: 8 }}>
-                            <FormGroup label="Indexing" fieldId="index-toggle" style={{ marginBottom: 8 }}>
-                                <Button variant={indexEnabled ? 'primary' : 'secondary'} onClick={() => {
-                                    // Toggle indexing enabled/disabled
-                                    if (indexEnabled) {
-                                        setIndexEnabled(false);
-                                        setIndexSelector(undefined);
-                                        setIndexValue(undefined);
+                    <FormGroup label="Index" fieldId="index-selection">
+                        <FormSelect value={localIndexSelector || 'first'} onChange={(_e, val) => setLocalIndexSelector((val as IndexSelector) || 'first')} id="index-selection">
+                            <FormSelectOption value="first" label="First (0)" />
+                            <FormSelectOption value="last" label="Last" />
+                            <FormSelectOption value="custom" label="Custom index" />
+                        </FormSelect>
+                        {localIndexSelector === 'custom' && (
+                            <TextInput
+                                type="number"
+                                value={localIndexValue !== undefined ? String(localIndexValue) : ''}
+                                onChange={(value: any, event?: any) => {
+                                    let v: string;
+                                    if (typeof value === 'string') {
+                                        v = value;
+                                    } else if (value && (value.currentTarget || value.target)) {
+                                        const tgt = (value.currentTarget || value.target) as any;
+                                        v = tgt && typeof tgt.value === 'string' ? tgt.value : String(tgt && tgt.value || '');
+                                    } else if (event && (event.currentTarget || event.target)) {
+                                        const tgt = (event.currentTarget || event.target) as any;
+                                        v = tgt && typeof tgt.value === 'string' ? tgt.value : String(tgt && tgt.value || '');
                                     } else {
-                                        // enable with default 'first' if nothing selected
-                                        setIndexEnabled(true);
-                                        setIndexSelector(prev => prev || 'first');
-                                        // Enabling indexing disables for-loop
-                                        if (enableForLoop) {
-                                            setEnableForLoop(false);
-                                        }
+                                        v = String(value == null ? '' : value);
                                     }
-                                }}>
-                                    {indexEnabled ? 'Indexing Enabled' : 'Indexing Disabled'}
-                                </Button>
-                                <HelperText>
-                                    <HelperTextItem>
-                                        When enabled, the mapping will pick a single item from the source array before transformations. Disable to operate on the whole array (for use with functions like join()).
-                                    </HelperTextItem>
-                                    <HelperTextItem variant="warning">
-                                        Indexing and for-loop are mutually exclusive. Disable for-loop to enable indexing.
-                                    </HelperTextItem>
-                                </HelperText>
-                            </FormGroup>
-
-                            {indexEnabled && (
-                                <FormGroup label="Index Selection" fieldId="index-selection">
-                                    <FormSelect value={indexSelector || ''} onChange={(_e, val) => setIndexSelector(val as IndexSelector || undefined)} id="index-selection">
-                                        <FormSelectOption value="" label="No index (use first/mapping or for-loop)" />
-                                        <FormSelectOption value="first" label="First (0)" />
-                                        <FormSelectOption value="last" label="Last" />
-                                        <FormSelectOption value="custom" label="Custom index" />
-                                    </FormSelect>
-                                    {indexSelector === 'custom' && (
-                                        <TextInput
-                                            type="number"
-                                            value={indexValue !== undefined ? String(indexValue) : ''}
-                                            onChange={(value: any, event?: any) => {
-                                                let v: string;
-                                                if (typeof value === 'string') {
-                                                    v = value;
-                                                } else if (value && (value.currentTarget || value.target)) {
-                                                    const tgt = (value.currentTarget || value.target) as any;
-                                                    v = tgt && typeof tgt.value === 'string' ? tgt.value : String(tgt && tgt.value || '');
-                                                } else if (event && (event.currentTarget || event.target)) {
-                                                    const tgt = (event.currentTarget || event.target) as any;
-                                                    v = tgt && typeof tgt.value === 'string' ? tgt.value : String(tgt && tgt.value || '');
-                                                } else {
-                                                    v = String(value == null ? '' : value);
-                                                }
-                                                setIndexValue(v === '' ? undefined : Number(v));
-                                            }}
-                                            id="index-value"
-                                            style={{ marginTop: 8, maxWidth: 120 }}
-                                        />
-                                    )}
-                                </FormGroup>
-                            )}
-                        </div>
-                    )}
+                                    setLocalIndexValue(v === '' ? undefined : Number(v));
+                                }}
+                                id="index-value"
+                                style={{ marginTop: 8 }}
+                            />
+                        )}
+                    </FormGroup>
                 </Form>
             )}
 

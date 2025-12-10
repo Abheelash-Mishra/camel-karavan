@@ -380,9 +380,10 @@ export class JsltGenerator {
             }
         }
 
-        // If a join() transformation is requested and the source is under an array,
-        // wrap the expression in a for-loop to build an array for join.
-        if (mapping.transformation && mapping.transformation.name === 'join' && !baseIterator && mapping.indexSelector === undefined) {
+        // If an array-oriented transformation is requested and the source is under an array,
+        // wrap the expression in a for-loop to build an array for the function (unless indexSelector is set)
+        const arrayFuncs = new Set(['sum','min','max','size','flatten','reverse','sort','unique','join']);
+        if (mapping.transformation && arrayFuncs.has(mapping.transformation.name) && !baseIterator && mapping.indexSelector === undefined) {
             const iteratorArrayPath = this.getNearestArrayAncestorPath(sourceField.path, sourceFields);
             if (iteratorArrayPath) {
                 const iteratorJslt = this.getJsltPath(iteratorArrayPath);
