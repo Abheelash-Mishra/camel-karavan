@@ -57,11 +57,11 @@ export function MappingEdge({
     const edgePath = `M ${sourceX},${sourceY} C ${c1x},${c1y} ${c2x},${c2y} ${targetX},${targetY}`;
 
     // Compute label position at t=0.5 on the bezier curve
-    const t = 0.5;
-    const x = (1 - t) ** 3 * sourceX + 3 * (1 - t) ** 2 * t * c1x + 3 * (1 - t) * t ** 2 * c2x + t ** 3 * targetX;
-    const y = (1 - t) ** 3 * sourceY + 3 * (1 - t) ** 2 * t * c1y + 3 * (1 - t) * t ** 2 * c2y + t ** 3 * targetY;
-    const labelX = x;
-    const labelY = y;
+    // const t = 0.5;
+    // const x = (1 - t) ** 3 * sourceX + 3 * (1 - t) ** 2 * t * c1x + 3 * (1 - t) * t ** 2 * c2x + t ** 3 * targetX;
+    // const y = (1 - t) ** 3 * sourceY + 3 * (1 - t) ** 2 * t * c1y + 3 * (1 - t) * t ** 2 * c2y + t ** 3 * targetY;
+    // const labelX = x;
+    // const labelY = y;
 
     const hasWarning = data?.hasWarning || false;
     const mappingId = data?.mappingId || id;

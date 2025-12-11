@@ -588,7 +588,7 @@ export function ReactFlowDataMapper() {
                             </Button>
                         </Tooltip>
                     </ToolbarItem>
-                    <ToolbarItem>
+                    {/* <ToolbarItem>
                         <Button
                             variant="secondary"
                             icon={<PlusCircleIcon />}
@@ -597,7 +597,7 @@ export function ReactFlowDataMapper() {
                         >
                             Upload JSLT
                         </Button>
-                    </ToolbarItem>
+                    </ToolbarItem> */}
                     <ToolbarItem>
                         <Tooltip content="Add a constant value as a source">
                             <Button

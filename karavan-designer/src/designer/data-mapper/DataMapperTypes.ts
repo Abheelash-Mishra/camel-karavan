@@ -121,6 +121,12 @@ export const JSLT_FUNCTIONS: JsltFunctionDef[] = [
     { name: 'min', description: 'Returns minimum numeric value in array', example: 'min(.)' },
     { name: 'max', description: 'Returns maximum numeric value in array', example: 'max(.)' },
 
+    // Array utility functions
+    { name: 'reverse', description: 'Reverses the order of elements in an array', example: 'reverse(.)' },
+    { name: 'flatten', description: 'Flattens nested arrays into a single-level array', example: 'flatten(.)' },
+    { name: 'unique', description: 'Removes duplicate elements from an array', example: 'unique(.)' },
+    { name: 'sort', description: 'Sorts elements in an array (comparable elements)', example: 'sort(.)' },
+
     { name: 'contains', description: 'Checks if a string contains a substring', example: 'contains(., "foo")', params: [{ name: 'substring', required: true, placeholder: 'foo' }] },
     { name: 'starts-with', description: 'Checks if string starts with a prefix', example: 'starts-with(., "abc")', params: [{ name: 'prefix', required: true, placeholder: 'abc' }] },
     { name: 'ends-with', description: 'Checks if string ends with a suffix', example: 'ends-with(., "xyz")', params: [{ name: 'suffix', required: true, placeholder: 'xyz' }] },

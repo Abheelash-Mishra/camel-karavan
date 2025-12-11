@@ -53,21 +53,40 @@ export function SchemaRootNode({ data }: { data: SchemaRootNodeData }) {
             }
         });
         setExpanded(prev => ({ ...map, ...prev }));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [fields]);
 
     const toggle = (id: string) => {
         setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
     };
 
-    const INDENT = 6; // pixels per depth level (reduced)
+    const INDENT = 15; // pixels per depth level (reduced)
 
 
     const renderChildren = (parentId?: string, depth = 0) => {
         const children = parentMap.get(parentId) || [];
         return children.map(field => (
             <div key={field.id} style={{ display: 'block' }}>
-                <div style={{ paddingLeft: depth * INDENT, display: 'flex', alignItems: 'center', position: 'relative', paddingTop: 6, paddingBottom: 6, borderRadius: 4, background: depth % 2 === 0 ? 'rgba(0,0,0,0.02)' : 'transparent' }}>
+                <div
+                    onClick={(e) => {
+                        const childrenOfArray = parentMap.get(field.id) || [];
+                        const itemNode = field.isArray ? childrenOfArray[0] : undefined;
+                        const canExpand = (!isPrimitive(field.type) && !field.isArray) || (field.isArray && itemNode?.type === 'object');
+
+                        if (canExpand) toggle(field.id);
+                    }}
+                    style={{
+                        marginLeft: depth * INDENT,
+                        display: 'flex',
+                        alignItems: 'center',
+                        position: 'relative',
+                        paddingTop: 6,
+                        paddingBottom: 6,
+                        // background: depth % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.05)',
+                        background: ((!isPrimitive(field.type) && !field.isArray) || (field.isArray && ((parentMap.get(field.id) || [])[0]?.type === 'object'))) ? 'rgba(0,0,0,0.04)' : 'transparent',
+                        borderLeft: ((!isPrimitive(field.type) && !field.isArray) || (field.isArray && ((parentMap.get(field.id) || [])[0]?.type === 'object'))) ? '2px solid rgba(0,0,0,0.5)' : 'none',
+                    }}
+                    >
+
                     {/* Render handle for primitives and for arrays of primitives only. */}
                     {(() => {
                         if (isPrimitive(field.type)) {
@@ -89,42 +108,24 @@ export function SchemaRootNode({ data }: { data: SchemaRootNodeData }) {
                         }
 
                         if (field.isArray) {
-                            const arrayChildren = parentMap.get(field.id) || [];
-                            const itemNode = arrayChildren[0];
-                            // Only show a handle for arrays when the item node is a primitive (array of primitives)
-                            if (!itemNode || isPrimitive(itemNode.type)) {
-                                return (
-                                    <Handle
-                                        type={side === 'source' ? 'source' : 'target'}
-                                        position={side === 'source' ? Position.Right : Position.Left}
-                                        id={field.path}
-                                        style={{
-                                            background: '#555',
-                                            width: 10,
-                                            height: 10,
-                                            top: '50%',
-                                            transform: 'translateY(-50%)',
-                                            marginRight: 8,
-                                        }}
-                                    />
-                                );
-                            }
+                            // Always show a handle for arrays; allowed functions will be restricted in the transformation popup
+                            return (
+                                <Handle
+                                    type={side === 'source' ? 'source' : 'target'}
+                                    position={side === 'source' ? Position.Right : Position.Left}
+                                    id={field.path}
+                                    style={{
+                                        background: '#555',
+                                        width: 10,
+                                        height: 10,
+                                        top: '50%',
+                                        transform: `translateX(${side === 'source' ? '3px' : '0px'}) translateY(-50%)`,
+                                    }}
+                                />
+                            );
                         }
 
                         return null;
-                    })()}
-
-                    {/* Allow expand/collapse for objects and arrays of objects */}
-                    {(() => {
-                        const childrenOfArray = parentMap.get(field.id) || [];
-                        const itemNode = field.isArray ? (childrenOfArray[0] || undefined) : undefined;
-                        const canExpand = (!isPrimitive(field.type) && !field.isArray) || (field.isArray && itemNode?.type === 'object');
-                        if (!canExpand) return null;
-                        return (
-                            <Button variant="plain" onClick={() => toggle(field.id)} style={{ marginRight: 8 }}>
-                                {expanded[field.id] ? '-' : '+'}
-                            </Button>
-                        );
                     })()}
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -164,8 +165,6 @@ export function SchemaRootNode({ data }: { data: SchemaRootNodeData }) {
             </div>
         ));
     };
-
-    // No DOM measurement — handles are centered inside each row using CSS
 
     return (
         <div style={{ padding: 8, minWidth: 280, maxWidth: 380, background: '#fff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 6, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', overflow: 'hidden' }}>

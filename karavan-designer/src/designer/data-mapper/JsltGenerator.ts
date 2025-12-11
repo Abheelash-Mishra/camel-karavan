@@ -114,6 +114,15 @@ export class JsltGenerator {
         console.log('[JsltGenerator] parentField=', parentField && { id: parentField.id, path: parentField.path, name: parentField.name });
         const parentId = parentField ? parentField.id : undefined;
         const directChildren = fields.filter(f => f.parent === parentId);
+
+        // Add top-level metadata properties indicating file types
+        // Top-level when no parentField is specified (prefix empty) or when parentField is a root (no parent)
+        if (!parentField || !parentField.parent) {
+            lines.push(`  "_sourceType": "json",`);
+            lines.push(`  "_targetType": "json",`);
+            lines.push(``);
+        }
+
         // eslint-disable-next-line no-console
         console.log('[JsltGenerator] directChildren=', directChildren.map(d => ({ id: d.id, name: d.name, path: d.path })));
 

@@ -301,108 +301,6 @@ export function TransformationPopup({
                 </>
             )}
 
-            {/* Index selection is shown when indexing makes sense and no array function is chosen,
-                or when a function supports index-or-whole choice (size, reverse) */}
-            {childOfArrayToNonArray && (!isArrayFunctionSelected || arrayFuncSupportsIndexOrWhole.has(selectedFunction)) && (
-                <Form style={{ marginBottom: '12px' }}>
-                    <Text component={TextVariants.h4} style={{ marginBottom: '8px' }}>
-                        {arrayFuncSupportsIndexOrWhole.has(selectedFunction) ? 'Apply To' : 'Index Selection'}
-                    </Text>
-                    <HelperText>
-                        <HelperTextItem>
-                            {arrayFuncSupportsIndexOrWhole.has(selectedFunction)
-                                ? 'Choose to apply the function to the whole array or a specific indexed item.'
-                                : 'Pick a single item from the source array to map.'}
-                        </HelperTextItem>
-                    </HelperText>
-                    {arrayFuncSupportsIndexOrWhole.has(selectedFunction) ? (
-                        <>
-                            <FormGroup label="Apply function to" fieldId="apply-to">
-                                <FormSelect
-                                    value={localIndexSelector ? 'indexed' : 'array'}
-                                    onChange={(_e, val) => {
-                                        if (val === 'array') {
-                                            setLocalIndexSelector(undefined);
-                                            setLocalIndexValue(undefined);
-                                        } else {
-                                            setLocalIndexSelector('first');
-                                            setLocalIndexValue(undefined);
-                                        }
-                                    }}
-                                    id="apply-to"
-                                >
-                                    <FormSelectOption value="array" label="Whole array" />
-                                    <FormSelectOption value="indexed" label="Specific index" />
-                                </FormSelect>
-                            </FormGroup>
-                            {localIndexSelector && (
-                                <FormGroup label="Index" fieldId="index-selection">
-                                    <FormSelect value={localIndexSelector || 'first'} onChange={(_e, val) => setLocalIndexSelector((val as IndexSelector) || 'first')} id="index-selection">
-                                        <FormSelectOption value="first" label="First (0)" />
-                                        <FormSelectOption value="last" label="Last" />
-                                        <FormSelectOption value="custom" label="Custom index" />
-                                    </FormSelect>
-                                    {localIndexSelector === 'custom' && (
-                                        <TextInput
-                                            type="number"
-                                            value={localIndexValue !== undefined ? String(localIndexValue) : ''}
-                                            onChange={(value: any, event?: any) => {
-                                                let v: string;
-                                                if (typeof value === 'string') {
-                                                    v = value;
-                                                } else if (value && (value.currentTarget || value.target)) {
-                                                    const tgt = (value.currentTarget || value.target) as any;
-                                                    v = tgt && typeof tgt.value === 'string' ? tgt.value : String(tgt && tgt.value || '');
-                                                } else if (event && (event.currentTarget || event.target)) {
-                                                    const tgt = (event.currentTarget || event.target) as any;
-                                                    v = tgt && typeof tgt.value === 'string' ? tgt.value : String(tgt && tgt.value || '');
-                                                } else {
-                                                    v = String(value == null ? '' : value);
-                                                }
-                                                setLocalIndexValue(v === '' ? undefined : Number(v));
-                                            }}
-                                            id="index-value"
-                                            style={{ marginTop: 8 }}
-                                        />
-                                    )}
-                                </FormGroup>
-                            )}
-                        </>
-                    ) : (
-                        <FormGroup label="Index" fieldId="index-selection">
-                            <FormSelect value={localIndexSelector || 'first'} onChange={(_e, val) => setLocalIndexSelector((val as IndexSelector) || 'first')} id="index-selection">
-                                <FormSelectOption value="first" label="First (0)" />
-                                <FormSelectOption value="last" label="Last" />
-                                <FormSelectOption value="custom" label="Custom index" />
-                            </FormSelect>
-                            {localIndexSelector === 'custom' && (
-                                <TextInput
-                                    type="number"
-                                    value={localIndexValue !== undefined ? String(localIndexValue) : ''}
-                                    onChange={(value: any, event?: any) => {
-                                        let v: string;
-                                        if (typeof value === 'string') {
-                                            v = value;
-                                        } else if (value && (value.currentTarget || value.target)) {
-                                            const tgt = (value.currentTarget || value.target) as any;
-                                            v = tgt && typeof tgt.value === 'string' ? tgt.value : String(tgt && tgt.value || '');
-                                        } else if (event && (event.currentTarget || event.target)) {
-                                            const tgt = (event.currentTarget || event.target) as any;
-                                            v = tgt && typeof tgt.value === 'string' ? tgt.value : String(tgt && tgt.value || '');
-                                        } else {
-                                            v = String(value == null ? '' : value);
-                                        }
-                                        setLocalIndexValue(v === '' ? undefined : Number(v));
-                                    }}
-                                    id="index-value"
-                                    style={{ marginTop: 8 }}
-                                />
-                            )}
-                        </FormGroup>
-                    )}
-                </Form>
-            )}
-
             {/* Transformation Configuration */}
             <Form>
                 <Text component={TextVariants.h4} style={{ marginBottom: '8px' }}>
@@ -425,13 +323,22 @@ export function TransformationPopup({
                         id="function-select"
                     >
                         <FormSelectOption key="none" value="" label="No transformation" />
-                        {JSLT_FUNCTIONS.map(func => (
+                        {(() => {
+                            // If mapping is from the array itself (single source field with type 'array'),
+                            // restrict to functions that operate directly on arrays.
+                            const allowedArrayFns = new Set(['size','string','boolean','reverse','flatten','unique','sort']);
+                            const isArraySource = sourceFieldDetails.length === 1 && (sourceFieldDetails[0]?.type === 'array' || sourceFieldDetails[0]?.isArray);
+                            const functionsToShow = isArraySource
+                                ? JSLT_FUNCTIONS.filter(f => allowedArrayFns.has(f.name))
+                                : JSLT_FUNCTIONS;
+                            return functionsToShow.map(func => (
                             <FormSelectOption 
                                 key={func.name} 
                                 value={func.name} 
                                 label={`${func.name}() - ${func.description}`}
                             />
-                        ))}
+                            ));
+                        })()}
                     </FormSelect>
                 </FormGroup>
 
@@ -489,6 +396,108 @@ export function TransformationPopup({
                             </HelperText>
                         )}
                     </>
+                )}
+
+                {/* Index selection is shown when indexing makes sense and no array function is chosen,
+                or when a function supports index-or-whole choice (size, reverse) */}
+                {childOfArrayToNonArray && (!isArrayFunctionSelected || arrayFuncSupportsIndexOrWhole.has(selectedFunction)) && (
+                    <Form style={{ marginBottom: '12px' }}>
+                        <Text component={TextVariants.h4} style={{ marginBottom: '8px' }}>
+                            {arrayFuncSupportsIndexOrWhole.has(selectedFunction) ? null : 'Index Selection'}
+                        </Text>
+                        <HelperText>
+                            <HelperTextItem>
+                                {arrayFuncSupportsIndexOrWhole.has(selectedFunction)
+                                    ? 'Choose to apply the function to the whole array or a specific indexed item.'
+                                    : 'Pick a single item from the source array to map.'}
+                            </HelperTextItem>
+                        </HelperText>
+                        {arrayFuncSupportsIndexOrWhole.has(selectedFunction) ? (
+                            <>
+                                <FormGroup label="Apply function to" fieldId="apply-to">
+                                    <FormSelect
+                                        value={localIndexSelector ? 'indexed' : 'array'}
+                                        onChange={(_e, val) => {
+                                            if (val === 'array') {
+                                                setLocalIndexSelector(undefined);
+                                                setLocalIndexValue(undefined);
+                                            } else {
+                                                setLocalIndexSelector('first');
+                                                setLocalIndexValue(undefined);
+                                            }
+                                        }}
+                                        id="apply-to"
+                                    >
+                                        <FormSelectOption value="array" label="Whole array" />
+                                        <FormSelectOption value="indexed" label="Specific index" />
+                                    </FormSelect>
+                                </FormGroup>
+                                {localIndexSelector && (
+                                    <FormGroup label="Index" fieldId="index-selection">
+                                        <FormSelect value={localIndexSelector || 'first'} onChange={(_e, val) => setLocalIndexSelector((val as IndexSelector) || 'first')} id="index-selection">
+                                            <FormSelectOption value="first" label="First (0)" />
+                                            <FormSelectOption value="last" label="Last" />
+                                            <FormSelectOption value="custom" label="Custom index" />
+                                        </FormSelect>
+                                        {localIndexSelector === 'custom' && (
+                                            <TextInput
+                                                type="number"
+                                                value={localIndexValue !== undefined ? String(localIndexValue) : ''}
+                                                onChange={(value: any, event?: any) => {
+                                                    let v: string;
+                                                    if (typeof value === 'string') {
+                                                        v = value;
+                                                    } else if (value && (value.currentTarget || value.target)) {
+                                                        const tgt = (value.currentTarget || value.target) as any;
+                                                        v = tgt && typeof tgt.value === 'string' ? tgt.value : String(tgt && tgt.value || '');
+                                                    } else if (event && (event.currentTarget || event.target)) {
+                                                        const tgt = (event.currentTarget || event.target) as any;
+                                                        v = tgt && typeof tgt.value === 'string' ? tgt.value : String(tgt && tgt.value || '');
+                                                    } else {
+                                                        v = String(value == null ? '' : value);
+                                                    }
+                                                    setLocalIndexValue(v === '' ? undefined : Number(v));
+                                                }}
+                                                id="index-value"
+                                                style={{ marginTop: 8 }}
+                                            />
+                                        )}
+                                    </FormGroup>
+                                )}
+                            </>
+                        ) : (
+                            <FormGroup label="Index" fieldId="index-selection">
+                                <FormSelect value={localIndexSelector || 'first'} onChange={(_e, val) => setLocalIndexSelector((val as IndexSelector) || 'first')} id="index-selection">
+                                    <FormSelectOption value="first" label="First (0)" />
+                                    <FormSelectOption value="last" label="Last" />
+                                    <FormSelectOption value="custom" label="Custom index" />
+                                </FormSelect>
+                                {localIndexSelector === 'custom' && (
+                                    <TextInput
+                                        type="number"
+                                        value={localIndexValue !== undefined ? String(localIndexValue) : ''}
+                                        onChange={(value: any, event?: any) => {
+                                            let v: string;
+                                            if (typeof value === 'string') {
+                                                v = value;
+                                            } else if (value && (value.currentTarget || value.target)) {
+                                                const tgt = (value.currentTarget || value.target) as any;
+                                                v = tgt && typeof tgt.value === 'string' ? tgt.value : String(tgt && tgt.value || '');
+                                            } else if (event && (event.currentTarget || event.target)) {
+                                                const tgt = (event.currentTarget || event.target) as any;
+                                                v = tgt && typeof tgt.value === 'string' ? tgt.value : String(tgt && tgt.value || '');
+                                            } else {
+                                                v = String(value == null ? '' : value);
+                                            }
+                                            setLocalIndexValue(v === '' ? undefined : Number(v));
+                                        }}
+                                        id="index-value"
+                                        style={{ marginTop: 8 }}
+                                    />
+                                )}
+                            </FormGroup>
+                        )}
+                    </Form>
                 )}
             </Form>
         </Modal>
